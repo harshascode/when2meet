@@ -51,6 +51,7 @@ initializeDatabase();
 
 // Now prepare the statements
 export const dbOperations = {
+    db, // Export the db instance through dbOperations
     // Create a new event
     createEvent: db.prepare(`
         INSERT INTO events (id, name, creator)
@@ -93,7 +94,11 @@ export const dbOperations = {
     // Get responses for an event
     getEventResponses: db.prepare(`
         SELECT * FROM responses WHERE event_id = ?
+    `),
+
+    // Delete existing responses for a participant in an event
+    deleteParticipantResponses: db.prepare(`
+        DELETE FROM responses 
+        WHERE event_id = ? AND participant_name = ?
     `)
 };
-
-export { db };

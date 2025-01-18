@@ -339,6 +339,7 @@
 						type="submit"
 						class="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
 						disabled={selectedDates.length === 0 || !eventName}
+						on:click={handleSubmit}
 					>
 						Create Event
 					</button>
