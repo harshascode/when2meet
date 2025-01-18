@@ -155,22 +155,16 @@
 			return;
 		}
 
-		// Generate a unique ID for the event
 		const eventId = uuidv4();
-
-		// Create event data object
 		const eventData = {
 			id: eventId,
 			name: eventName,
-			creator: '', // You can add user identification here
+			creator: '', // Add creator information if needed
 			dates: selectedDates.map((date) => date.toISOString()),
-			timeSlots: selectedTimes,
-			createdAt: new Date().toISOString(),
-			responses: [] // This will store participant responses
+			timeSlots: selectedTimes
 		};
 
 		try {
-			// Send the data to your backend
 			const response = await fetch('/api/events', {
 				method: 'POST',
 				headers: {
@@ -183,24 +177,16 @@
 				throw new Error('Failed to create event');
 			}
 
-			// Get the response data
 			const result = await response.json();
-
-			// Generate the share link
 			const shareLink = `${window.location.origin}/events/${eventId}`;
 
-			// Show success message with the link
-			// You might want to use a modal or a more sophisticated UI component
-			const message = `Event created successfully!\n\nShare this link with others:\n${shareLink}`;
-			alert(message);
+			// Show success message
+			alert(`Event created! Share this link: ${shareLink}`);
 
-			// Optional: Copy link to clipboard
-			await navigator.clipboard.writeText(shareLink);
-
-			// Redirect to the event page
+			// Redirect to event page
 			window.location.href = `/events/${eventId}`;
 		} catch (error) {
-			console.error('Error creating event:', error);
+			console.error('Error:', error);
 			alert('Failed to create event. Please try again.');
 		}
 	}
