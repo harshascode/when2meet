@@ -3,6 +3,14 @@ import Database from 'better-sqlite3';
 // Create a database instance
 const db = new Database('events.db', { verbose: console.log });
 
+// Enable WAL mode for better concurrency
+db.pragma('journal_mode = WAL');
+// Add these pragmas for better performance
+db.pragma('synchronous = NORMAL');
+db.pragma('temp_store = MEMORY');
+db.pragma('mmap_size = 30000000000');
+db.pragma('page_size = 32768');
+
 // Initialize database with tables
 export function initializeDatabase() {
     try {
