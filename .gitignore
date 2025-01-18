@@ -24,5 +24,3 @@ vite.config.ts.timestamp-*
 
 # SQLite
 *.db
-
-pnpm-lock.yaml
