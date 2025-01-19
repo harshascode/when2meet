@@ -3,12 +3,10 @@
 	import Header from '$lib/Header.svelte';
 	import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 
-	let eventName = '';
-	let currentMonth = new Date();
-	let selectedDates: Date[] = [];
+	let eventName = $state('');
+	let currentMonth = $state(new Date());
+	let selectedDates: Date[] = $state([]);
 
-	// Generate calendar days
-	$: calendarDays = generateCalendarDays(currentMonth);
 
 	function generateCalendarDays(date: Date) {
 		const start = startOfMonth(date);
@@ -75,13 +73,11 @@
 	}
 
 	// Time selection state
-	let startTime = '09:00';
-	let endTime = '17:00';
-	let selectedTimes: string[] = [];
+	let startTime = $state('09:00');
+	let endTime = $state('17:00');
+	let selectedTimes: string[] = $state([]);
 	let timeInterval = 30; // minutes interval between time slots
 
-	// Generate time slots based on start and end time
-	$: timeSlots = generateTimeSlots(startTime, endTime, timeInterval);
 
 	function generateTimeSlots(start: string, end: string, interval: number): string[] {
 		const slots: string[] = [];
@@ -167,6 +163,10 @@
 			alert('Failed to create event. Please try again.');
 		}
 	}
+	// Generate calendar days
+	let calendarDays = $derived(generateCalendarDays(currentMonth));
+	// Generate time slots based on start and end time
+	let timeSlots = $derived(generateTimeSlots(startTime, endTime, timeInterval));
 </script>
 
 <div class="flex min-h-screen flex-col">
@@ -194,13 +194,13 @@
 					<!-- Calendar Component -->
 					<div class="rounded-md border bg-white p-4">
 						<div class="mb-4 flex items-center justify-between">
-							<button class="rounded-md px-3 py-1 hover:bg-gray-100" on:click={previousMonth}>
+							<button class="rounded-md px-3 py-1 hover:bg-gray-100" onclick={previousMonth}>
 								&larr;
 							</button>
 							<h3 class="text-lg font-medium">
 								{format(currentMonth, 'MMMM yyyy')}
 							</h3>
-							<button class="rounded-md px-3 py-1 hover:bg-gray-100" on:click={nextMonth}>
+							<button class="rounded-md px-3 py-1 hover:bg-gray-100" onclick={nextMonth}>
 								&rarr;
 							</button>
 						</div>
@@ -220,7 +220,7 @@
                                         {isDateSelected(date)
 										? 'bg-green-500 text-white hover:bg-green-600'
 										: 'hover:bg-gray-100'}"
-									on:click={() => toggleDateSelection(date)}
+									onclick={() => toggleDateSelection(date)}
 								>
 									{format(date, 'd')}
 								</button>
@@ -229,7 +229,7 @@
 					</div>
 
 					<div class="text-center">
-						<button class="rounded-md border px-4 py-2 text-sm hover:bg-gray-100" on:click={today}>
+						<button class="rounded-md border px-4 py-2 text-sm hover:bg-gray-100" onclick={today}>
 							Today
 						</button>
 					</div>
@@ -286,7 +286,7 @@
                         {selectedTimes.includes(time)
 										? 'border-green-500 bg-green-500 text-white hover:bg-green-600'
 										: 'border-gray-200 hover:bg-gray-50'}"
-									on:click={() => toggleTimeSelection(time)}
+									onclick={() => toggleTimeSelection(time)}
 								>
 									{formatTime(time)}
 								</button>
@@ -316,7 +316,7 @@
 						type="submit"
 						class="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
 						disabled={selectedDates.length === 0 || !eventName}
-						on:click={handleSubmit}
+						onclick={handleSubmit}
 					>
 						Create Event
 					</button>

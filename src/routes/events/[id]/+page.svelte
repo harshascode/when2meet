@@ -6,12 +6,12 @@
 	import { format } from 'date-fns';
 
 	const eventId = $page.params.id;
-	let event: any = null;
-	let loading = true;
-	let error: string | null = null;
-	let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-	let participantName = '';
-	let availability: { [key: string]: { [key: string]: boolean } } = {};
+	let event: any = $state(null);
+	let loading = $state(true);
+	let error: string | null = $state(null);
+	let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
+	let participantName = $state('');
+	let availability: { [key: string]: { [key: string]: boolean } } = $state({});
 
 	// Get all available timezones
 	const timezones = Intl.supportedValuesOf('timeZone');
@@ -200,7 +200,7 @@
                                                     class="border-l border-b border-gray-200 transition-colors duration-150 cursor-pointer hover:bg-opacity-80"
                                                     class:bg-green-500={availability[date][timeSlot]}
                                                     class:bg-gray-100={!availability[date][timeSlot]}
-                                                    on:click={() => toggleAvailability(date, timeSlot)}
+                                                    onclick={() => toggleAvailability(date, timeSlot)}
                                                     style="height: 40px;"
                                                 ></div>
                                             {/each}
