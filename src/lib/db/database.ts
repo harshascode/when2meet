@@ -13,9 +13,9 @@ db.pragma('page_size = 32768');
 
 // Initialize database with tables
 export function initializeDatabase() {
-    try {
-        // Create events table
-        db.exec(`
+	try {
+		// Create events table
+		db.exec(`
             CREATE TABLE IF NOT EXISTS events (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -47,11 +47,11 @@ export function initializeDatabase() {
             );
         `);
 
-        console.log('Database tables created successfully');
-    } catch (error) {
-        console.error('Error initializing database:', error);
-        throw error;
-    }
+		console.log('Database tables created successfully');
+	} catch (error) {
+		console.error('Error initializing database:', error);
+		throw error;
+	}
 }
 
 // Initialize the database before preparing statements
@@ -59,53 +59,53 @@ initializeDatabase();
 
 // Now prepare the statements
 export const dbOperations = {
-    db, // Export the db instance through dbOperations
-    // Create a new event
-    createEvent: db.prepare(`
+	db, // Export the db instance through dbOperations
+	// Create a new event
+	createEvent: db.prepare(`
         INSERT INTO events (id, name, creator)
         VALUES (?, ?, ?)
     `),
 
-    // Add event dates
-    addEventDate: db.prepare(`
+	// Add event dates
+	addEventDate: db.prepare(`
         INSERT INTO event_dates (event_id, date)
         VALUES (?, ?)
     `),
 
-    // Add event time slots
-    addEventTimeSlot: db.prepare(`
+	// Add event time slots
+	addEventTimeSlot: db.prepare(`
         INSERT INTO event_time_slots (event_id, time_slot)
         VALUES (?, ?)
     `),
 
-    // Get event by ID
-    getEvent: db.prepare(`
+	// Get event by ID
+	getEvent: db.prepare(`
         SELECT * FROM events WHERE id = ?
     `),
 
-    // Get event dates
-    getEventDates: db.prepare(`
+	// Get event dates
+	getEventDates: db.prepare(`
         SELECT date FROM event_dates WHERE event_id = ?
     `),
 
-    // Get event time slots
-    getEventTimeSlots: db.prepare(`
+	// Get event time slots
+	getEventTimeSlots: db.prepare(`
         SELECT time_slot FROM event_time_slots WHERE event_id = ?
     `),
 
-    // Add response
-    addResponse: db.prepare(`
+	// Add response
+	addResponse: db.prepare(`
         INSERT INTO responses (event_id, participant_name, date, time_slot)
         VALUES (?, ?, ?, ?)
     `),
 
-    // Get responses for an event
-    getEventResponses: db.prepare(`
+	// Get responses for an event
+	getEventResponses: db.prepare(`
         SELECT * FROM responses WHERE event_id = ?
     `),
 
-    // Delete existing responses for a participant in an event
-    deleteParticipantResponses: db.prepare(`
+	// Delete existing responses for a participant in an event
+	deleteParticipantResponses: db.prepare(`
         DELETE FROM responses 
         WHERE event_id = ? AND participant_name = ?
     `)

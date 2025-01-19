@@ -4,5 +4,5 @@ import type { Handle } from '@sveltejs/kit';
 // No need to initialize it here as it's done when the module is imported
 
 export const handle: Handle = async ({ event, resolve }) => {
-    return resolve(event);
+	return resolve(event);
 };

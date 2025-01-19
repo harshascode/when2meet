@@ -7,7 +7,6 @@
 	let currentMonth = $state(new Date());
 	let selectedDates: Date[] = $state([]);
 
-
 	function generateCalendarDays(date: Date) {
 		const start = startOfMonth(date);
 		const end = endOfMonth(date);
@@ -78,7 +77,6 @@
 	let selectedTimes: string[] = $state([]);
 	let timeInterval = 30; // minutes interval between time slots
 
-
 	function generateTimeSlots(start: string, end: string, interval: number): string[] {
 		const slots: string[] = [];
 		const [startHours, startMinutes] = start.split(':').map(Number);
@@ -110,7 +108,7 @@
 		const displayHours = hours % 12 || 12;
 		return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 	}
-	
+
 	import { v4 as uuidv4 } from 'uuid';
 
 	// Modify the handleSubmit function
