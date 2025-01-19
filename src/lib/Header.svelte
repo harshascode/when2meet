@@ -6,7 +6,7 @@
 			</a>
 			<nav class="flex gap-6">
 				<a
-					href="/new"
+					href="/"
 					class="text-sm font-medium text-green-600 transition-colors hover:text-green-700"
 				>
 					Plan a New Event

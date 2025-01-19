@@ -114,30 +114,7 @@
 		const displayHours = hours % 12 || 12;
 		return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 	}
-
-	// Update the handleSubmit function to include time validation
-	// function handleSubmit() {
-	//     if (!eventName) {
-	//         alert('Please enter an event name');
-	//         return;
-	//     }
-	//     if (selectedDates.length === 0) {
-	//         alert('Please select at least one date');
-	//         return;
-	//     }
-	//     if (selectedTimes.length === 0) {
-	//         alert('Please select at least one time slot');
-	//         return;
-	//     }
-
-	//     // Here you would handle the form submission
-	//     console.log({
-	//         eventName,
-	//         selectedDates,
-	//         selectedTimes
-	//     });
-	// }
-
+	
 	import { v4 as uuidv4 } from 'uuid';
 
 	// Modify the handleSubmit function
