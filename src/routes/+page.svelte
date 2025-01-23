@@ -8,16 +8,27 @@
 	interface CalendarDay {
 		date: Date;
 		isCurrentMonth: boolean;
+		dayLabel: string;
+		ariaLabel: string;
 	}
 
-	// State management using Svelte's runes
+	interface TimeSlot {
+		time: string;
+		formatted: string;
+	}
+
+	// State management
 	let eventName = $state('');
 	let currentMonth = $state(new Date());
 	let selectedDates: Date[] = $state([]);
 	let startTime = $state('09:00');
 	let endTime = $state('17:00');
 	let selectedTimes: string[] = $state([]);
-	const timeInterval = 30; // minutes interval between time slots
+	const timeInterval = 30;
+
+	// Derived state
+	let selectedDatesSet = $derived(new Set(selectedDates.map((d) => d.getTime())));
+	let selectedTimesSet = $derived(new Set(selectedTimes));
 
 	// Calendar functions
 	function generateCalendarDays(date: Date): CalendarDay[] {
@@ -28,36 +39,48 @@
 
 		const paddingDays = Array(firstDayOfWeek)
 			.fill(null)
-			.map((_, index) => ({
-				date: new Date(new Date(start).setDate(start.getDate() - (firstDayOfWeek - index))),
-				isCurrentMonth: false
-			}));
+			.map((_, index) => {
+				const date = new Date(start);
+				date.setDate(start.getDate() - (firstDayOfWeek - index));
+				return {
+					date,
+					isCurrentMonth: false,
+					dayLabel: format(date, 'd'),
+					ariaLabel: format(date, 'MMMM d, yyyy')
+				};
+			});
 
 		const calendarDays = days.map((day) => ({
 			date: day,
-			isCurrentMonth: true
+			isCurrentMonth: true,
+			dayLabel: format(day, 'd'),
+			ariaLabel: format(day, 'MMMM d, yyyy')
 		}));
 
 		const lastDayOfWeek = end.getDay();
 		const remainingDays = 6 - lastDayOfWeek;
 		const endPaddingDays = Array(remainingDays)
 			.fill(null)
-			.map((_, index) => ({
-				date: new Date(new Date(end).setDate(end.getDate() + (index + 1))),
-				isCurrentMonth: false
-			}));
+			.map((_, index) => {
+				const date = new Date(end);
+				date.setDate(end.getDate() + (index + 1));
+				return {
+					date,
+					isCurrentMonth: false,
+					dayLabel: format(date, 'd'),
+					ariaLabel: format(date, 'MMMM d, yyyy')
+				};
+			});
 
 		return [...paddingDays, ...calendarDays, ...endPaddingDays];
 	}
 
-	// Date selection functions
+	// Date selection
 	function toggleDateSelection(date: Date): void {
-		const index = selectedDates.findIndex((d) => isSameDay(d, date));
-		selectedDates =
-			index === -1 ? [...selectedDates, date] : selectedDates.filter((_, i) => i !== index);
+		selectedDates = selectedDatesSet.has(date.getTime())
+			? selectedDates.filter((d) => !isSameDay(d, date))
+			: [...selectedDates, date];
 	}
-
-	const isDateSelected = (date: Date): boolean => selectedDates.some((d) => isSameDay(d, date));
 
 	// Calendar navigation
 	const today = () => (currentMonth = new Date());
@@ -66,27 +89,25 @@
 	const nextMonth = () =>
 		(currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
 
-	// Time selection functions
-	function generateTimeSlots(start: string, end: string, interval: number): string[] {
+	// Time slots generation
+	function generateTimeSlots(start: string, end: string, interval: number): TimeSlot[] {
 		const [startHours, startMinutes] = start.split(':').map(Number);
 		const [endHours, endMinutes] = end.split(':').map(Number);
 		const startInMinutes = startHours * 60 + startMinutes;
 		const endInMinutes = endHours * 60 + endMinutes;
-		const slots: string[] = [];
+		const slots: TimeSlot[] = [];
 
 		for (let time = startInMinutes; time <= endInMinutes; time += interval) {
 			const hours = Math.floor(time / 60);
 			const minutes = time % 60;
-			slots.push(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+			const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+			slots.push({
+				time: timeString,
+				formatted: formatTime(timeString)
+			});
 		}
 
 		return slots;
-	}
-
-	function toggleTimeSelection(time: string): void {
-		selectedTimes = selectedTimes.includes(time)
-			? selectedTimes.filter((t) => t !== time)
-			: [...selectedTimes, time];
 	}
 
 	function formatTime(time: string): string {
@@ -96,12 +117,18 @@
 		return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 	}
 
+	function toggleTimeSelection(time: string): void {
+		selectedTimes = selectedTimesSet.has(time)
+			? selectedTimes.filter((t) => t !== time)
+			: [...selectedTimes, time];
+	}
+
 	// Form submission
 	async function handleSubmit(): Promise<void> {
 		try {
 			if (!eventName) throw new Error('Please enter an event name');
-			if (selectedDates.length === 0) throw new Error('Please select at least one date');
-			if (selectedTimes.length === 0) throw new Error('Please select at least one time slot');
+			if (!selectedDates.length) throw new Error('Please select at least one date');
+			if (!selectedTimes.length) throw new Error('Please select at least one time slot');
 
 			const eventId = uuidv4();
 			const eventData = {
@@ -118,35 +145,23 @@
 			});
 
 			if (!response.ok) throw new Error('Failed to create event');
-
-			await response.json();
-			const shareLink = `${window.location.origin}/events/${eventId}`;
-			// Removed alert for success message
-			// alert(`Event created! Share this link: ${shareLink}`);
 			window.location.href = `/events/${eventId}`;
 		} catch (error) {
-			console.error('Error:', error);
-			// Removed alert for error message
 			alert(error instanceof Error ? error.message : 'Failed to create event. Please try again.');
 		}
 	}
 
-	// Using $derived instead of $: for reactive declarations
+	// Derived values
 	let calendarDays = $derived(generateCalendarDays(currentMonth));
 	let timeSlots = $derived(generateTimeSlots(startTime, endTime, timeInterval));
-
-	// Add a derived value for sorted dates
 	let sortedSelectedDates = $derived([...selectedDates].sort((a, b) => a.getTime() - b.getTime()));
 </script>
-
-<!-- Rest of the template code remains the same -->
 
 <div class="flex min-h-screen flex-col">
 	<Header />
 
 	<main class="container mx-auto max-w-4xl flex-1 py-8">
 		<div class="grid gap-8">
-			<!-- Event Name Input -->
 			<div class="text-center">
 				<input
 					type="text"
@@ -162,7 +177,6 @@
 				<div class="space-y-4">
 					<h2 class="text-center text-lg font-medium">What dates might work?</h2>
 					<div class="rounded-md border bg-white p-4">
-						<!-- Calendar Navigation -->
 						<div class="mb-4 flex items-center justify-between">
 							<button
 								class="rounded-md px-3 py-1 hover:bg-gray-100"
@@ -181,31 +195,28 @@
 							</button>
 						</div>
 
-						<!-- Calendar Grid -->
 						<div class="grid grid-cols-7 gap-1" role="grid">
 							{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day}
 								<div class="p-2 text-center text-sm font-medium" role="columnheader">{day}</div>
 							{/each}
 
-							{#each calendarDays as { date, isCurrentMonth }}
+							{#each calendarDays as day (day.date.getTime())}
 								<button
 									class="aspect-square rounded-md p-2 text-center text-sm
-                                        {isCurrentMonth ? '' : 'text-gray-400'}
-                                        {isDateSelected(date)
+                                        {!day.isCurrentMonth && 'text-gray-400'}
+                                        {selectedDatesSet.has(day.date.getTime())
 										? 'bg-green-500 text-white hover:bg-green-600'
 										: 'hover:bg-gray-100'}"
-									onclick={() => toggleDateSelection(date)}
-									aria-label={format(date, 'MMMM d, yyyy')}
-									aria-pressed={isDateSelected(date)}
+									onclick={() => toggleDateSelection(day.date)}
+									aria-label={day.ariaLabel}
+									aria-pressed={selectedDatesSet.has(day.date.getTime())}
 								>
-									{format(date, 'd')}
+									{day.dayLabel}
 								</button>
 							{/each}
 						</div>
 					</div>
 
-					<!-- Selected Dates Display -->
-					<!-- In the template, replace the selectedDates.sort() with sortedSelectedDates -->
 					<div class="mt-4 space-y-2">
 						<h3 class="text-sm font-medium">Selected Dates:</h3>
 						<div class="flex flex-wrap gap-2">
@@ -222,7 +233,6 @@
 				<div class="space-y-4">
 					<h2 class="text-center text-lg font-medium">What times might work?</h2>
 					<div class="rounded-md border bg-white p-4">
-						<!-- Time Range Controls -->
 						<div class="mb-4 flex justify-center gap-4">
 							<div class="space-y-2">
 								<label for="startTime" class="block text-sm font-medium text-gray-700">
@@ -248,18 +258,17 @@
 							</div>
 						</div>
 
-						<!-- Time Slots Grid -->
 						<div class="grid max-h-[400px] grid-cols-2 gap-2 overflow-y-auto p-2">
-							{#each timeSlots as time}
+							{#each timeSlots as timeSlot (timeSlot.time)}
 								<button
 									class="rounded-md border p-2 text-sm transition-colors
-                                        {selectedTimes.includes(time)
+                                        {selectedTimesSet.has(timeSlot.time)
 										? 'border-green-500 bg-green-500 text-white hover:bg-green-600'
 										: 'border-gray-200 hover:bg-gray-50'}"
-									onclick={() => toggleTimeSelection(time)}
-									aria-pressed={selectedTimes.includes(time)}
+									onclick={() => toggleTimeSelection(timeSlot.time)}
+									aria-pressed={selectedTimesSet.has(timeSlot.time)}
 								>
-									{formatTime(time)}
+									{timeSlot.formatted}
 								</button>
 							{/each}
 						</div>
@@ -267,7 +276,6 @@
 				</div>
 			</div>
 
-			<!-- Submit Button -->
 			<div class="space-y-4 text-center">
 				<div class="flex items-center justify-center gap-2">
 					<button
