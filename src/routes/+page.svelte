@@ -1,295 +1,281 @@
 <script lang="ts">
-	import Footer from '$lib/Footer.svelte';
-	import Header from '$lib/Header.svelte';
-	import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
-	import { v4 as uuidv4 } from 'uuid';
+    import Footer from '$lib/Footer.svelte';
+    import Header from '$lib/Header.svelte';
+    import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+    import { v4 as uuidv4 } from 'uuid';
 
-	// Types
-	interface CalendarDay {
-		date: Date;
-		isCurrentMonth: boolean;
-		dayLabel: string;
-		ariaLabel: string;
-	}
+    // Types
+    interface CalendarDay {
+        date: Date;
+        isCurrentMonth: boolean;
+        dayLabel: string;
+        ariaLabel: string;
+        isToday: boolean;
+    }
 
-	interface TimeSlot {
-		time: string;
-		formatted: string;
-	}
+    interface TimeSlot {
+        time: string;
+        formatted: string;
+    }
 
-	// State management
-	let eventName = $state('');
-	let currentMonth = $state(new Date());
-	let selectedDates: Date[] = $state([]);
-	let startTime = $state('09:00');
-	let endTime = $state('17:00');
-	let selectedTimes: string[] = $state([]);
-	const timeInterval = 30;
+    // State management
+    let eventName = $state('');
+    let currentMonth = $state(new Date());
+    let selectedDates: Date[] = $state([]);
+    let startTime = $state('09:00');
+    let endTime = $state('17:00');
+    let selectedTimes: string[] = $state([]);
+    const timeInterval = 30;
 
-	// Derived state
-	let selectedDatesSet = $derived(new Set(selectedDates.map((d) => d.getTime())));
-	let selectedTimesSet = $derived(new Set(selectedTimes));
+    // Derived state
+    let selectedDatesSet = $derived(new Set(selectedDates.map((d) => d.getTime())));
+    let selectedTimesSet = $derived(new Set(selectedTimes));
 
-	// Calendar functions
-	function generateCalendarDays(date: Date): CalendarDay[] {
-		const start = startOfMonth(date);
-		const end = endOfMonth(date);
-		const days = eachDayOfInterval({ start, end });
-		const firstDayOfWeek = start.getDay();
+    // Calendar functions
+    function generateCalendarDays(date: Date): CalendarDay[] {
+        const start = startOfMonth(date);
+        const end = endOfMonth(date);
+        const days = eachDayOfInterval({ start, end });
+        const firstDayOfWeek = start.getDay();
+        const today = new Date();
 
-		const paddingDays = Array(firstDayOfWeek)
-			.fill(null)
-			.map((_, index) => {
-				const date = new Date(start);
-				date.setDate(start.getDate() - (firstDayOfWeek - index));
-				return {
-					date,
-					isCurrentMonth: false,
-					dayLabel: format(date, 'd'),
-					ariaLabel: format(date, 'MMMM d, yyyy')
-				};
-			});
+        const paddingDays = Array(firstDayOfWeek)
+            .fill(null)
+            .map((_, index) => {
+                const date = new Date(start);
+                date.setDate(start.getDate() - (firstDayOfWeek - index));
+                return createCalendarDay(date, false, today);
+            });
 
-		const calendarDays = days.map((day) => ({
-			date: day,
-			isCurrentMonth: true,
-			dayLabel: format(day, 'd'),
-			ariaLabel: format(day, 'MMMM d, yyyy')
-		}));
+        const calendarDays = days.map((day) => createCalendarDay(day, true, today));
 
-		const lastDayOfWeek = end.getDay();
-		const remainingDays = 6 - lastDayOfWeek;
-		const endPaddingDays = Array(remainingDays)
-			.fill(null)
-			.map((_, index) => {
-				const date = new Date(end);
-				date.setDate(end.getDate() + (index + 1));
-				return {
-					date,
-					isCurrentMonth: false,
-					dayLabel: format(date, 'd'),
-					ariaLabel: format(date, 'MMMM d, yyyy')
-				};
-			});
+        const lastDayOfWeek = end.getDay();
+        const remainingDays = 6 - lastDayOfWeek;
+        const endPaddingDays = Array(remainingDays)
+            .fill(null)
+            .map((_, index) => {
+                const date = new Date(end);
+                date.setDate(end.getDate() + (index + 1));
+                return createCalendarDay(date, false, today);
+            });
 
-		return [...paddingDays, ...calendarDays, ...endPaddingDays];
-	}
+        return [...paddingDays, ...calendarDays, ...endPaddingDays];
+    }
 
-	// Date selection
-	function toggleDateSelection(date: Date): void {
-		selectedDates = selectedDatesSet.has(date.getTime())
-			? selectedDates.filter((d) => !isSameDay(d, date))
-			: [...selectedDates, date];
-	}
+    function createCalendarDay(date: Date, isCurrentMonth: boolean, today: Date): CalendarDay {
+        return {
+            date,
+            isCurrentMonth,
+            dayLabel: format(date, 'd'),
+            ariaLabel: format(date, 'MMMM d, yyyy'),
+            isToday: isSameDay(date, today)
+        };
+    }
 
-	// Calendar navigation
-	const today = () => (currentMonth = new Date());
-	const previousMonth = () =>
-		(currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
-	const nextMonth = () =>
-		(currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
+    function toggleDateSelection(date: Date): void {
+        selectedDates = selectedDatesSet.has(date.getTime())
+            ? selectedDates.filter((d) => !isSameDay(d, date))
+            : [...selectedDates, date];
+    }
 
-	// Time slots generation
-	function generateTimeSlots(start: string, end: string, interval: number): TimeSlot[] {
-		const [startHours, startMinutes] = start.split(':').map(Number);
-		const [endHours, endMinutes] = end.split(':').map(Number);
-		const startInMinutes = startHours * 60 + startMinutes;
-		const endInMinutes = endHours * 60 + endMinutes;
-		const slots: TimeSlot[] = [];
+    const today = () => (currentMonth = new Date());
+    const previousMonth = () => (currentMonth = new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)));
+    const nextMonth = () => (currentMonth = new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)));
 
-		for (let time = startInMinutes; time <= endInMinutes; time += interval) {
-			const hours = Math.floor(time / 60);
-			const minutes = time % 60;
-			const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-			slots.push({
-				time: timeString,
-				formatted: formatTime(timeString)
-			});
-		}
+    function generateTimeSlots(start: string, end: string, interval: number): TimeSlot[] {
+        const [startHours, startMinutes] = start.split(':').map(Number);
+        const [endHours, endMinutes] = end.split(':').map(Number);
+        const startInMinutes = startHours * 60 + startMinutes;
+        const endInMinutes = endHours * 60 + endMinutes;
+        const slots: TimeSlot[] = [];
 
-		return slots;
-	}
+        for (let time = startInMinutes; time <= endInMinutes; time += interval) {
+            const hours = Math.floor(time / 60);
+            const minutes = time % 60;
+            const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            slots.push({
+                time: timeString,
+                formatted: formatTime(timeString)
+            });
+        }
+        return slots;
+    }
 
-	function formatTime(time: string): string {
-		const [hours, minutes] = time.split(':').map(Number);
-		const period = hours >= 12 ? 'PM' : 'AM';
-		const displayHours = hours % 12 || 12;
-		return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
-	}
+    function formatTime(time: string): string {
+        const [hours, minutes] = time.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    }
 
-	function toggleTimeSelection(time: string): void {
-		selectedTimes = selectedTimesSet.has(time)
-			? selectedTimes.filter((t) => t !== time)
-			: [...selectedTimes, time];
-	}
+    function toggleTimeSelection(time: string): void {
+        selectedTimes = selectedTimesSet.has(time)
+            ? selectedTimes.filter((t) => t !== time)
+            : [...selectedTimes, time];
+    }
 
-	// Form submission
-	async function handleSubmit(): Promise<void> {
-		try {
-			if (!eventName) throw new Error('Please enter an event name');
-			if (!selectedDates.length) throw new Error('Please select at least one date');
-			if (!selectedTimes.length) throw new Error('Please select at least one time slot');
+    async function handleSubmit(): Promise<void> {
+        if (!eventName || !selectedDates.length || !selectedTimes.length) {
+            alert('Please fill in all required fields');
+            return;
+        }
 
-			const eventId = uuidv4();
-			const eventData = {
-				id: eventId,
-				name: eventName,
-				dates: selectedDates.map((date) => date.toISOString()),
-				timeSlots: selectedTimes
-			};
+        const eventId = uuidv4();
+        const eventData = {
+            id: eventId,
+            name: eventName,
+            dates: selectedDates.map((date) => date.toISOString()),
+            timeSlots: selectedTimes
+        };
 
-			const response = await fetch('/api/events', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(eventData)
-			});
+        try {
+            await fetch('/api/events', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(eventData)
+            });
+            window.location.href = `/events/${eventId}`;
+        } catch (error) {
+            alert('Failed to create event. Please try again.');
+        }
+    }
 
-			if (!response.ok) throw new Error('Failed to create event');
-			window.location.href = `/events/${eventId}`;
-		} catch (error) {
-			alert(error instanceof Error ? error.message : 'Failed to create event. Please try again.');
-		}
-	}
-
-	// Derived values
-	let calendarDays = $derived(generateCalendarDays(currentMonth));
-	let timeSlots = $derived(generateTimeSlots(startTime, endTime, timeInterval));
-	let sortedSelectedDates = $derived([...selectedDates].sort((a, b) => a.getTime() - b.getTime()));
+    let calendarDays = $derived(generateCalendarDays(currentMonth));
+    let timeSlots = $derived(generateTimeSlots(startTime, endTime, timeInterval));
+    let sortedSelectedDates = $derived([...selectedDates].sort((a, b) => a.getTime() - b.getTime()));
 </script>
 
-<div class="flex min-h-screen flex-col">
-	<Header />
+<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <Header />
 
-	<main class="container mx-auto max-w-4xl flex-1 py-8">
-		<div class="grid gap-8">
-			<div class="text-center">
-				<input
-					type="text"
-					placeholder="New Event Name"
-					class="mx-auto w-full max-w-md rounded-md border border-gray-300 px-4 py-2 text-center text-xl font-medium"
-					bind:value={eventName}
-					aria-label="Event name"
-				/>
-			</div>
+    <main class="container mx-auto max-w-6xl px-4 py-8">
+        <!-- Event Name Input -->
+        <div class="max-w-2xl mx-auto mb-10">
+            <input
+                type="text"
+                placeholder="Enter event name"
+                class="w-full px-6 py-4 text-xl text-center bg-white/80 backdrop-blur-sm 
+                rounded-xl shadow-sm border border-gray-200 
+                focus:ring-2 focus:ring-blue-500 focus:border-blue-500 
+                transition-all duration-200"
+                bind:value={eventName}
+            />
+        </div>
 
-			<div class="grid gap-8 md:grid-cols-2">
-				<!-- Calendar Section -->
-				<div class="space-y-4">
-					<h2 class="text-center text-lg font-medium">What dates might work?</h2>
-					<div class="rounded-md border bg-white p-4">
-						<div class="mb-4 flex items-center justify-between">
-							<button
-								class="rounded-md px-3 py-1 hover:bg-gray-100"
-								onclick={previousMonth}
-								aria-label="Previous month"
-							>
-								&larr;
-							</button>
-							<h3 class="text-lg font-medium">{format(currentMonth, 'MMMM yyyy')}</h3>
-							<button
-								class="rounded-md px-3 py-1 hover:bg-gray-100"
-								onclick={nextMonth}
-								aria-label="Next month"
-							>
-								&rarr;
-							</button>
-						</div>
+        <div class="grid lg:grid-cols-2 gap-6">
+            <!-- Calendar Card -->
+            <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <button
+                        class="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+						aria-label="Previous Month"
+                        onclick={previousMonth}
+                    >
+                        <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    
+                    <h2 class="text-xl font-medium text-gray-800">
+                        {format(currentMonth, 'MMMM yyyy')}
+                    </h2>
 
-						<div class="grid grid-cols-7 gap-1" role="grid">
-							{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day}
-								<div class="p-2 text-center text-sm font-medium" role="columnheader">{day}</div>
-							{/each}
+                    <button
+                        class="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+						aria-label="Previous Month"
+                        onclick={nextMonth}
+                    >
+                        <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
 
-							{#each calendarDays as day (day.date.getTime())}
-								<button
-									class="aspect-square rounded-md p-2 text-center text-sm
-                                        {!day.isCurrentMonth && 'text-gray-400'}
-                                        {selectedDatesSet.has(day.date.getTime())
-										? 'bg-green-500 text-white hover:bg-green-600'
-										: 'hover:bg-gray-100'}"
-									onclick={() => toggleDateSelection(day.date)}
-									aria-label={day.ariaLabel}
-									aria-pressed={selectedDatesSet.has(day.date.getTime())}
-								>
-									{day.dayLabel}
-								</button>
-							{/each}
-						</div>
-					</div>
+                <div class="grid grid-cols-7 gap-1">
+                    {#each ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as day}
+                        <div class="text-center text-sm font-medium text-gray-500 py-2">{day}</div>
+                    {/each}
 
-					<div class="mt-4 space-y-2">
-						<h3 class="text-sm font-medium">Selected Dates:</h3>
-						<div class="flex flex-wrap gap-2">
-							{#each sortedSelectedDates as date}
-								<span class="rounded-full bg-green-100 px-3 py-1 text-sm text-green-800">
-									{format(date, 'MMM d, yyyy')}
-								</span>
-							{/each}
-						</div>
-					</div>
-				</div>
+                    {#each calendarDays as day (day.date.getTime())}
+                        <button
+                            class="aspect-square rounded-lg text-sm font-medium
+                                {!day.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
+                                {day.isToday ? 'ring-2 ring-blue-400' : ''}
+                                {selectedDatesSet.has(day.date.getTime())
+                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                    : 'hover:bg-blue-50'}"
+                            onclick={() => toggleDateSelection(day.date)}
+                        >
+                            {day.dayLabel}
+                        </button>
+                    {/each}
+                </div>
 
-				<!-- Time Selection Section -->
-				<div class="space-y-4">
-					<h2 class="text-center text-lg font-medium">What times might work?</h2>
-					<div class="rounded-md border bg-white p-4">
-						<div class="mb-4 flex justify-center gap-4">
-							<div class="space-y-2">
-								<label for="startTime" class="block text-sm font-medium text-gray-700">
-									Start Time
-								</label>
-								<input
-									id="startTime"
-									type="time"
-									bind:value={startTime}
-									class="rounded-md border border-gray-300 px-3 py-1.5"
-								/>
-							</div>
-							<div class="space-y-2">
-								<label for="endTime" class="block text-sm font-medium text-gray-700">
-									End Time
-								</label>
-								<input
-									id="endTime"
-									type="time"
-									bind:value={endTime}
-									class="rounded-md border border-gray-300 px-3 py-1.5"
-								/>
-							</div>
-						</div>
+                {#if selectedDates.length > 0}
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        {#each sortedSelectedDates as date}
+                            <span class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded-full">
+                                {format(date, 'MMM d')}
+                            </span>
+                        {/each}
+                    </div>
+                {/if}
+            </div>
 
-						<div class="grid max-h-[400px] grid-cols-2 gap-2 overflow-y-auto p-2">
-							{#each timeSlots as timeSlot (timeSlot.time)}
-								<button
-									class="rounded-md border p-2 text-sm transition-colors
-                                        {selectedTimesSet.has(timeSlot.time)
-										? 'border-green-500 bg-green-500 text-white hover:bg-green-600'
-										: 'border-gray-200 hover:bg-gray-50'}"
-									onclick={() => toggleTimeSelection(timeSlot.time)}
-									aria-pressed={selectedTimesSet.has(timeSlot.time)}
-								>
-									{timeSlot.formatted}
-								</button>
-							{/each}
-						</div>
-					</div>
-				</div>
-			</div>
+            <!-- Time Selection Card -->
+            <div class="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-gray-200 p-6">
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="startTime" class="block text-sm text-gray-600 mb-1">Start</label>
+                        <input
+                            id="startTime"
+                            type="time"
+                            bind:value={startTime}
+                            class="w-full px-3 py-2 rounded-lg border border-gray-200 
+                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+                    <div>
+                        <label for="endTime" class="block text-sm text-gray-600 mb-1">End</label>
+                        <input
+                            id="endTime"
+                            type="time"
+                            bind:value={endTime}
+                            class="w-full px-3 py-2 rounded-lg border border-gray-200 
+                            focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+                </div>
 
-			<div class="space-y-4 text-center">
-				<div class="flex items-center justify-center gap-2">
-					<button
-						type="submit"
-						class="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50"
-						disabled={selectedDates.length === 0 || !eventName || selectedTimes.length === 0}
-						onclick={handleSubmit}
-					>
-						Create Event
-					</button>
-				</div>
-			</div>
-		</div>
-	</main>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[360px] overflow-y-auto">
+                    {#each timeSlots as timeSlot (timeSlot.time)}
+                        <button
+                            class="px-4 py-2 rounded-lg text-sm font-medium
+                                {selectedTimesSet.has(timeSlot.time)
+                                    ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
+                            onclick={() => toggleTimeSelection(timeSlot.time)}
+                        >
+                            {timeSlot.formatted}
+                        </button>
+                    {/each}
+                </div>
+            </div>
+        </div>
 
-	<Footer />
+        <!-- Create Button -->
+        <div class="mt-8 text-center">
+            <button
+                onclick={handleSubmit}
+                class="px-8 py-3 bg-blue-600 text-white text-lg font-medium rounded-xl
+                hover:bg-blue-700 transition-colors
+                disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
+            >
+                Create Event
+            </button>
+        </div>
+    </main>
+
+    <Footer />
 </div>
