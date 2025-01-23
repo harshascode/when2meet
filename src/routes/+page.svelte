@@ -27,10 +27,6 @@
     let selectedTimes: string[] = $state([]);
     const timeInterval = 30;
 
-    // Drag-to-select state
-    let isDragging = $state(false);
-    let startDragDate: Date | null = $state(null);
-
     // Derived state
     let selectedDatesSet = $derived(new Set(selectedDates.map((d) => d.getTime())));
     let selectedTimesSet = $derived(new Set(selectedTimes));
@@ -80,52 +76,6 @@
         selectedDates = selectedDatesSet.has(date.getTime())
             ? selectedDates.filter((d) => !isSameDay(d, date))
             : [...selectedDates, date];
-    }
-
-    // Drag-to-select functions
-    function handleMouseDown(date: Date): void {
-        isDragging = true;
-        startDragDate = date;
-        toggleDateSelection(date);
-    }
-
-    function handleMouseOver(date: Date): void {
-        if (isDragging && startDragDate) {
-            const allDates = calendarDays.map((day) => day.date);
-            const startIndex = allDates.findIndex((d) => isSameDay(d, startDragDate!));
-            const endIndex = allDates.findIndex((d) => isSameDay(d, date));
-
-            if (startIndex !== -1 && endIndex !== -1) {
-                const startRow = Math.floor(startIndex / 7);
-                const startCol = startIndex % 7;
-                const endRow = Math.floor(endIndex / 7);
-                const endCol = endIndex % 7;
-
-                // Select vertically (same column)
-                if (startCol === endCol) {
-                    for (let row = Math.min(startRow, endRow); row <= Math.max(startRow, endRow); row++) {
-                        const index = row * 7 + startCol;
-                        if (index >= 0 && index < allDates.length) {
-                            toggleDateSelection(allDates[index]);
-                        }
-                    }
-                }
-                // Select horizontally (same row)
-                else if (startRow === endRow) {
-                    for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-                        const index = startRow * 7 + col;
-                        if (index >= 0 && index < allDates.length) {
-                            toggleDateSelection(allDates[index]);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    function handleMouseUp(): void {
-        isDragging = false;
-        startDragDate = null;
     }
 
     const today = () => (currentMonth = new Date());
@@ -218,7 +168,7 @@
                 <div class="flex items-center justify-between mb-6">
                     <button
                         class="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                        aria-label="Previous Month"
+						aria-label="Previous Month"
                         onclick={previousMonth}
                     >
                         <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -232,7 +182,7 @@
 
                     <button
                         class="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                        aria-label="Next Month"
+						aria-label="Previous Month"
                         onclick={nextMonth}
                     >
                         <svg class="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -247,7 +197,6 @@
                     {/each}
 
                     {#each calendarDays as day (day.date.getTime())}
-                        <!-- svelte-ignore a11y_mouse_events_have_key_events -->
                         <button
                             class="aspect-square rounded-lg text-sm font-medium
                                 {!day.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
@@ -255,9 +204,7 @@
                                 {selectedDatesSet.has(day.date.getTime())
                                     ? 'bg-blue-500 text-white hover:bg-blue-600'
                                     : 'hover:bg-blue-50'}"
-                            onmousedown={() => handleMouseDown(day.date)}
-                            onmouseover={() => handleMouseOver(day.date)}
-                            onmouseup={handleMouseUp}
+                            onclick={() => toggleDateSelection(day.date)}
                         >
                             {day.dayLabel}
                         </button>
