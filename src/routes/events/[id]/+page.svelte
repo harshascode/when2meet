@@ -1,17 +1,48 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	// Type definitions
+	interface Availability {
+		[date: string]: {
+			[timeSlot: string]: boolean;
+		};
+	}
+
+	interface Participant {
+		name: string;
+		timezone: string;
+		availability: Availability;
+		lastUpdated: string;
+	}
+
+	interface Response {
+		participant_name: string;
+		date: string;
+		time_slot: string;
+		created_at: string;
+		timezone?: string;
+	}
+
+	interface Event {
+		name: string;
+		dates: string[];
+		timeSlots: string[];
+		responses: Response[];
+	}
+
+	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import Header from '$lib/Header.svelte';
 	import Footer from '$lib/Footer.svelte';
 	import { format } from 'date-fns';
 
-	const eventId = page.params.id;
-	let event: any = $state(null);
+	const eventId = $page.params.id;
+	let event: Event | null = $state(null);
 	let loading = $state(true);
 	let error: string | null = $state(null);
 	let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
 	let participantName = $state('');
-	let availability: { [key: string]: { [key: string]: boolean } } = $state({});
+	let availability: Availability = $state({});
+	let participants: Participant[] = $state([]);
+	let selectedParticipant: Participant | null = $state(null);
 
 	// Get all available timezones
 	const timezones = Intl.supportedValuesOf('timeZone');
@@ -20,15 +51,43 @@
 		try {
 			const response = await fetch(`/api/events/${eventId}`);
 			if (!response.ok) throw new Error('Event not found');
-			event = await response.json();
+			event = (await response.json()) as Event;
 
 			// Initialize availability grid
 			event.dates.forEach((date: string) => {
 				availability[date] = {};
-				event.timeSlots.forEach((timeSlot: string) => {
+				event!.timeSlots.forEach((timeSlot: string) => {
 					availability[date][timeSlot] = false;
 				});
 			});
+
+			// Group participants by name with their availability
+			if (event.responses) {
+				const participantMap = new Map<string, Participant>();
+
+				event.responses.forEach((response: Response) => {
+					if (!participantMap.has(response.participant_name)) {
+						participantMap.set(response.participant_name, {
+							name: response.participant_name,
+							timezone: response.timezone || 'Unknown',
+							availability: {},
+							lastUpdated: response.created_at || new Date().toISOString()
+						});
+					}
+
+					const participant = participantMap.get(response.participant_name);
+					if (participant) {
+						if (!participant.availability[response.date]) {
+							participant.availability[response.date] = {};
+						}
+						participant.availability[response.date][response.time_slot] = true;
+					}
+				});
+
+				participants = Array.from(participantMap.values()).sort(
+					(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+				);
+			}
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -41,12 +100,15 @@
 		return format(date, 'MMM d\nEEE');
 	}
 
+	function formatDateTime(dateStr: string) {
+		return new Date(dateStr).toLocaleString();
+	}
+
 	function toggleAvailability(date: string, timeSlot: string) {
 		availability[date][timeSlot] = !availability[date][timeSlot];
 		saveAvailability();
 	}
 
-	// Update the saveAvailability function
 	async function saveAvailability() {
 		if (!participantName) {
 			alert('Please enter your name before selecting availability');
@@ -61,7 +123,8 @@
 				},
 				body: JSON.stringify({
 					participantName,
-					availability
+					availability,
+					timezone
 				})
 			});
 
@@ -79,10 +142,32 @@
 			document.body.appendChild(successMessage);
 			setTimeout(() => successMessage.remove(), 3000);
 
-			// Refresh the event data to show updated group availability
+			// Refresh the event data
 			const eventResponse = await fetch(`/api/events/${eventId}`);
 			if (eventResponse.ok) {
-				event = await eventResponse.json();
+				event = (await eventResponse.json()) as Event;
+				// Update participants list
+				const participantMap = new Map<string, Participant>();
+				event.responses.forEach((response: Response) => {
+					if (!participantMap.has(response.participant_name)) {
+						participantMap.set(response.participant_name, {
+							name: response.participant_name,
+							availability: {},
+							timezone: response.timezone || 'Unknown',
+							lastUpdated: response.created_at
+						});
+					}
+					const participant = participantMap.get(response.participant_name);
+					if (participant) {
+						if (!participant.availability[response.date]) {
+							participant.availability[response.date] = {};
+						}
+						participant.availability[response.date][response.time_slot] = true;
+					}
+				});
+				participants = Array.from(participantMap.values()).sort(
+					(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+				);
 			}
 		} catch (error: any) {
 			console.error('Error saving availability:', error);
@@ -90,13 +175,24 @@
 		}
 	}
 
-	// Function to get group availability percentage for a specific slot
 	function getGroupAvailability(date: string, timeSlot: string): number {
 		if (!event?.responses) return 0;
 		const responsesForSlot = event.responses.filter(
-			(r: any) => r.date === date && r.time_slot === timeSlot
+			(r: Response) => r.date === date && r.time_slot === timeSlot
 		);
 		return (responsesForSlot.length / (event.responses.length || 1)) * 100;
+	}
+
+	function getParticipantAvailability(
+		participant: Participant | null,
+		date: string,
+		timeSlot: string
+	): boolean {
+		return participant?.availability?.[date]?.[timeSlot] || false;
+	}
+
+	function viewParticipantAvailability(participant: Participant): void {
+		selectedParticipant = participant;
 	}
 </script>
 
@@ -117,7 +213,7 @@
 			<div class="space-y-8">
 				<!-- Event Header Section -->
 				<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-					<h1 class="text-3xl font-bold text-gray-800">{event.name}</h1>
+					<h1 class="text-3xl font-bold text-gray-800">{event?.name}</h1>
 					<div class="mt-4 flex items-center gap-2 text-gray-600">
 						<span>Share this event:</span>
 						<a
@@ -181,14 +277,12 @@
 								<div class="overflow-hidden rounded-lg border border-gray-200">
 									<div
 										class="grid"
-										style="grid-template-columns: auto repeat({event.dates
-											.length}, minmax(80px, 1fr))"
+										style="grid-template-columns: auto repeat({event?.dates?.length ||
+											0}, minmax(80px, 1fr))"
 									>
-										<!-- Time Column Header -->
 										<div class="border-b border-gray-200 bg-gray-50 p-3"></div>
 
-										<!-- Date Headers -->
-										{#each event.dates as date}
+										{#each event?.dates || [] as date}
 											<div
 												class="border-b border-l border-gray-200 bg-gray-50 p-3 text-center font-medium"
 											>
@@ -196,20 +290,17 @@
 											</div>
 										{/each}
 
-										<!-- Time Slots -->
-										{#each event.timeSlots as timeSlot}
-											<!-- Time Label -->
+										{#each event?.timeSlots || [] as timeSlot}
 											<div class="border-b border-gray-200 p-3 text-sm text-gray-600">
 												{timeSlot}
 											</div>
 
-											{#each event.dates as date}
-												<!-- Replace the div with these click handlers: -->
+											{#each event?.dates || [] as date}
 												<button
 													type="button"
 													class="cursor-pointer border-b border-l border-gray-200 transition-colors duration-150 hover:bg-opacity-80"
-													class:bg-green-500={availability[date][timeSlot]}
-													class:bg-gray-100={!availability[date][timeSlot]}
+													class:bg-green-500={availability[date]?.[timeSlot]}
+													class:bg-gray-100={!availability[date]?.[timeSlot]}
 													onclick={() => toggleAvailability(date, timeSlot)}
 													onkeydown={(e) => {
 														if (e.key === 'Enter' || e.key === ' ') {
@@ -219,7 +310,7 @@
 													}}
 													role="gridcell"
 													aria-label={`Select availability for ${date} at ${timeSlot}`}
-													aria-selected={availability[date][timeSlot]}
+													aria-selected={availability[date]?.[timeSlot]}
 													style="height: 40px;"
 												></button>
 											{/each}
@@ -233,7 +324,7 @@
 					<!-- Group's Availability -->
 					<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 						<h2 class="mb-4 text-xl font-semibold">
-							Group's Availability ({event.responses?.length || 0} responses)
+							Group's Availability ({event?.responses?.length || 0} responses)
 						</h2>
 						<div class="mb-6 flex items-center gap-6">
 							<div class="flex items-center">
@@ -251,14 +342,12 @@
 								<div class="overflow-hidden rounded-lg border border-gray-200">
 									<div
 										class="grid"
-										style="grid-template-columns: auto repeat({event.dates
-											.length}, minmax(80px, 1fr))"
+										style="grid-template-columns: auto repeat({event?.dates?.length ||
+											0}, minmax(80px, 1fr))"
 									>
-										<!-- Time Column Header -->
 										<div class="border-b border-gray-200 bg-gray-50 p-3"></div>
 
-										<!-- Date Headers -->
-										{#each event.dates as date}
+										{#each event?.dates || [] as date}
 											<div
 												class="border-b border-l border-gray-200 bg-gray-50 p-3 text-center font-medium"
 											>
@@ -266,14 +355,12 @@
 											</div>
 										{/each}
 
-										<!-- Time Slots -->
-										{#each event.timeSlots as timeSlot}
-											<!-- Time Label -->
+										{#each event?.timeSlots || [] as timeSlot}
 											<div class="border-b border-gray-200 p-3 text-sm text-gray-600">
 												{timeSlot}
 											</div>
 
-											{#each event.dates as date}
+											{#each event?.dates || [] as date}
 												<div
 													class="border-b border-l border-gray-200"
 													style="height: 40px; background-color: rgba(34, 197, 94, {getGroupAvailability(
@@ -281,7 +368,7 @@
 														timeSlot
 													) / 100})"
 													title={`${getGroupAvailability(date, timeSlot)}% available at ${timeSlot}`}
-												></div>
+												/>
 											{/each}
 										{/each}
 									</div>
@@ -290,6 +377,140 @@
 						</div>
 					</div>
 				</div>
+
+				<!-- Participants List Section -->
+				<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+					<h2 class="mb-4 text-xl font-semibold">Participants ({participants.length})</h2>
+
+					<div class="overflow-x-auto">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th
+										class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+									>
+										Name
+									</th>
+									<th
+										class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+									>
+										Timezone
+									</th>
+									<th
+										class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+									>
+										Last Updated
+									</th>
+									<th
+										class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+									>
+										Actions
+									</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-gray-200 bg-white">
+								{#each participants as participant}
+									<tr>
+										<td class="whitespace-nowrap px-6 py-4">
+											<div class="text-sm font-medium text-gray-900">
+												{participant.name}
+											</div>
+										</td>
+										<td class="whitespace-nowrap px-6 py-4">
+											<div class="text-sm text-gray-500">
+												{participant.timezone || 'Unknown'}
+											</div>
+										</td>
+										<td class="whitespace-nowrap px-6 py-4">
+											<div class="text-sm text-gray-500">
+												{formatDateTime(participant.lastUpdated)}
+											</div>
+										</td>
+										<td class="whitespace-nowrap px-6 py-4">
+											<button
+												class="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
+												onclick={() => viewParticipantAvailability(participant)}
+											>
+												View Availability
+											</button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
+
+				<!-- Selected Participant's Availability Modal -->
+				{#if selectedParticipant}
+					<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+						<div class="w-full max-w-4xl rounded-lg bg-white p-6">
+							<div class="mb-4 flex items-center justify-between">
+								<h3 class="text-lg font-semibold">
+									{selectedParticipant.name}'s Availability
+								</h3>
+								<!-- svelte-ignore a11y_consider_explicit_label -->
+								<button
+									class="rounded-full p-1 hover:bg-gray-100"
+									onclick={() => (selectedParticipant = null)}
+								>
+									<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M6 18L18 6M6 6l12 12"
+										/>
+									</svg>
+								</button>
+							</div>
+
+							<div class="overflow-x-auto">
+								<div class="inline-block min-w-full align-middle">
+									<div class="overflow-hidden rounded-lg border border-gray-200">
+										<div
+											class="grid"
+											style="grid-template-columns: auto repeat({event?.dates?.length ||
+												0}, minmax(80px, 1fr))"
+										>
+											<div class="border-b border-gray-200 bg-gray-50 p-3"></div>
+											{#each event?.dates || [] as date}
+												<div
+													class="border-b border-l border-gray-200 bg-gray-50 p-3 text-center font-medium"
+												>
+													{formatDate(date)}
+												</div>
+											{/each}
+
+											{#each event?.timeSlots || [] as timeSlot}
+												<div class="border-b border-gray-200 p-3 text-sm text-gray-600">
+													{timeSlot}
+												</div>
+
+												{#each event?.dates || [] as date}
+													<div
+														class="border-b border-l border-gray-200"
+														class:bg-green-500={getParticipantAvailability(
+															selectedParticipant,
+															date,
+															timeSlot
+														)}
+														class:bg-gray-100={!getParticipantAvailability(
+															selectedParticipant,
+															date,
+															timeSlot
+														)}
+														style="height: 40px;"
+													></div>
+												{/each}
+											{/each}
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</main>
