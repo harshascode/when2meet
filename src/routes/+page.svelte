@@ -107,6 +107,32 @@
 		return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 	}
 
+	// New function to convert time string to minutes
+	function timeToMinutes(time: string): number {
+		const [hours, minutes] = time.split(':').map(Number);
+		return hours * 60 + minutes;
+	}
+
+	// New function to auto-select time slots
+	function updateSelectedTimeSlots(): void {
+		const startMinutes = timeToMinutes(startTime);
+		const endMinutes = timeToMinutes(endTime);
+
+		selectedTimes = timeSlots
+			.filter((slot) => {
+				const slotMinutes = timeToMinutes(slot.time);
+				return slotMinutes >= startMinutes && slotMinutes <= endMinutes;
+			})
+			.map((slot) => slot.time);
+	}
+
+	// Modified time selection handlers
+	// Use this:
+	$effect(() => {
+		if (startTime && endTime) {
+			updateSelectedTimeSlots();
+		}
+	});
 	// Event handlers
 	const navigationHandlers = {
 		today: () => (currentMonth = new Date()),
@@ -261,7 +287,7 @@
 							id="startTime"
 							bind:value={startTime}
 							class="w-full rounded-lg border border-gray-200 px-3 py-2
-                                focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+								focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
 						>
 							{#each timeSlots as timeOption}
 								<option value={timeOption.time}>{timeOption.formatted}</option>
@@ -274,7 +300,7 @@
 							id="endTime"
 							bind:value={endTime}
 							class="w-full rounded-lg border border-gray-200 px-3 py-2
-                                focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+								focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
 						>
 							{#each timeSlots as timeOption}
 								<option value={timeOption.time}>{timeOption.formatted}</option>
