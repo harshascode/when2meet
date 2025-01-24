@@ -18,7 +18,7 @@
 		date: string;
 		time_slot: string;
 		created_at: string;
-		timezone?: string;
+		timezone: string;
 	}
 
 	interface Event {
@@ -61,7 +61,7 @@
 				});
 			});
 
-			// Group participants by name with their availability
+			// Process participants data
 			if (event.responses) {
 				const participantMap = new Map<string, Participant>();
 
@@ -69,9 +69,9 @@
 					if (!participantMap.has(response.participant_name)) {
 						participantMap.set(response.participant_name, {
 							name: response.participant_name,
-							timezone: response.timezone || 'Unknown',
+							timezone: response.timezone,
 							availability: {},
-							lastUpdated: response.created_at || new Date().toISOString()
+							lastUpdated: response.created_at
 						});
 					}
 
@@ -124,7 +124,7 @@
 				body: JSON.stringify({
 					participantName,
 					availability,
-					timezone
+					timezone // Added timezone to the request
 				})
 			});
 
@@ -146,33 +146,39 @@
 			const eventResponse = await fetch(`/api/events/${eventId}`);
 			if (eventResponse.ok) {
 				event = (await eventResponse.json()) as Event;
-				// Update participants list
-				const participantMap = new Map<string, Participant>();
-				event.responses.forEach((response: Response) => {
-					if (!participantMap.has(response.participant_name)) {
-						participantMap.set(response.participant_name, {
-							name: response.participant_name,
-							availability: {},
-							timezone: response.timezone || 'Unknown',
-							lastUpdated: response.created_at
-						});
-					}
-					const participant = participantMap.get(response.participant_name);
-					if (participant) {
-						if (!participant.availability[response.date]) {
-							participant.availability[response.date] = {};
-						}
-						participant.availability[response.date][response.time_slot] = true;
-					}
-				});
-				participants = Array.from(participantMap.values()).sort(
-					(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
-				);
+				updateParticipants();
 			}
 		} catch (error: any) {
 			console.error('Error saving availability:', error);
 			alert(error.message || 'Failed to save your availability. Please try again.');
 		}
+	}
+
+	function updateParticipants() {
+		if (!event?.responses) return;
+
+		const participantMap = new Map<string, Participant>();
+		event.responses.forEach((response: Response) => {
+			if (!participantMap.has(response.participant_name)) {
+				participantMap.set(response.participant_name, {
+					name: response.participant_name,
+					timezone: response.timezone,
+					availability: {},
+					lastUpdated: response.created_at
+				});
+			}
+			const participant = participantMap.get(response.participant_name);
+			if (participant) {
+				if (!participant.availability[response.date]) {
+					participant.availability[response.date] = {};
+				}
+				participant.availability[response.date][response.time_slot] = true;
+			}
+		});
+
+		participants = Array.from(participantMap.values()).sort(
+			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+		);
 	}
 
 	function getGroupAvailability(date: string, timeSlot: string): number {
@@ -196,10 +202,10 @@
 	}
 </script>
 
-<div class="flex min-h-screen flex-col">
+<div class="flex min-h-screen flex-col bg-gray-50">
 	<Header />
 
-	<main class="container mx-auto max-w-6xl flex-1 px-4 py-8">
+	<main class="container mx-auto max-w-7xl flex-1 px-4 py-6">
 		{#if loading}
 			<div class="py-8 text-center">
 				<div
@@ -210,65 +216,97 @@
 		{:else if error}
 			<div class="rounded-lg bg-red-50 p-4 text-center text-red-500">{error}</div>
 		{:else}
-			<div class="space-y-8">
+			<div class="space-y-6">
 				<!-- Event Header Section -->
-				<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-					<h1 class="text-3xl font-bold text-gray-800">{event?.name}</h1>
-					<div class="mt-4 flex items-center gap-2 text-gray-600">
-						<span>Share this event:</span>
-						<a
-							href={`${window.location.href}`}
-							class="break-all text-blue-600 underline hover:text-blue-800"
-						>
+				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+					<h1 class="text-2xl font-bold text-gray-800">{event?.name}</h1>
+					<div class="mt-2 flex items-center gap-2 text-sm text-gray-600">
+						<span>Share:</span>
+						<a href={`${window.location.href}`} class="text-blue-600 hover:text-blue-800">
 							{window.location.href}
 						</a>
 					</div>
 				</div>
 
-				<!-- User Input Section -->
-				<div class="space-y-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-					<div class="max-w-md">
-						<label for="participantName" class="mb-2 block text-sm font-medium text-gray-700">
-							Your Name
-						</label>
-						<input
-							type="text"
-							id="participantName"
-							bind:value={participantName}
-							class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-							placeholder="Enter your name"
-						/>
-					</div>
+				<div class="grid gap-6 lg:grid-cols-3">
+					<!-- User Input Section -->
+					<div class="lg:col-span-1">
+						<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+							<h2 class="mb-4 text-lg font-semibold text-gray-800">Your Information</h2>
+							<div class="space-y-4">
+								<div>
+									<label for="participantName" class="block text-sm font-medium text-gray-700">
+										Name
+									</label>
+									<input
+										type="text"
+										id="participantName"
+										bind:value={participantName}
+										class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+										placeholder="Enter your name"
+									/>
+								</div>
 
-					<div class="max-w-md">
-						<label for="timezone" class="mb-2 block text-sm font-medium text-gray-700">
-							Your Time Zone
-						</label>
-						<select
-							id="timezone"
-							bind:value={timezone}
-							class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-						>
-							{#each timezones as tz}
-								<option value={tz}>{tz}</option>
-							{/each}
-						</select>
-					</div>
-				</div>
-
-				<!-- Availability Grids -->
-				<div class="grid gap-8 lg:grid-cols-2">
-					<!-- Individual's Availability -->
-					<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-						<h2 class="mb-4 text-xl font-semibold">Your Availability</h2>
-						<div class="mb-6 flex items-center gap-6">
-							<div class="flex items-center">
-								<div class="mr-2 h-4 w-4 rounded border border-gray-300 bg-gray-100"></div>
-								<span class="text-sm">Unavailable</span>
+								<div>
+									<label for="timezone" class="block text-sm font-medium text-gray-700">
+										Time Zone
+									</label>
+									<select
+										id="timezone"
+										bind:value={timezone}
+										class="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+									>
+										{#each timezones as tz}
+											<option value={tz}>{tz}</option>
+										{/each}
+									</select>
+								</div>
 							</div>
-							<div class="flex items-center">
-								<div class="mr-2 h-4 w-4 rounded border border-gray-300 bg-green-500"></div>
-								<span class="text-sm">Available</span>
+						</div>
+
+						<!-- Participants List -->
+						<div class="mt-6 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+							<h2 class="mb-3 text-lg font-semibold text-gray-800">
+								Participants ({participants.length})
+							</h2>
+							<div class="divide-y divide-gray-200">
+								{#each participants as participant}
+									<div class="py-3">
+										<div class="flex items-center justify-between">
+											<div>
+												<p class="font-medium text-gray-900">{participant.name}</p>
+												<p class="text-sm text-gray-500">{participant.timezone}</p>
+												<p class="text-xs text-gray-400">
+													Updated: {formatDateTime(participant.lastUpdated)}
+												</p>
+											</div>
+											<button
+												class="rounded-md bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100"
+												onclick={() => viewParticipantAvailability(participant)}
+											>
+												View
+											</button>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					</div>
+
+					<!-- Availability Grids Section -->
+					<!-- Individual's Availability -->
+					<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+						<div class="mb-4 flex items-center justify-between">
+							<h2 class="text-lg font-semibold text-gray-800">Your Availability</h2>
+							<div class="flex items-center gap-4">
+								<div class="flex items-center">
+									<div class="mr-2 h-3 w-3 rounded bg-gray-100"></div>
+									<span class="text-sm text-gray-600">Unavailable</span>
+								</div>
+								<div class="flex items-center">
+									<div class="mr-2 h-3 w-3 rounded bg-green-500"></div>
+									<span class="text-sm text-gray-600">Available</span>
+								</div>
 							</div>
 						</div>
 
@@ -278,40 +316,33 @@
 									<div
 										class="grid"
 										style="grid-template-columns: auto repeat({event?.dates?.length ||
-											0}, minmax(80px, 1fr))"
+											0}, minmax(60px, 1fr))"
 									>
-										<div class="border-b border-gray-200 bg-gray-50 p-3"></div>
-
+										<!-- Headers -->
+										<div class="border-b border-gray-200 bg-gray-50 p-2"></div>
 										{#each event?.dates || [] as date}
 											<div
-												class="border-b border-l border-gray-200 bg-gray-50 p-3 text-center font-medium"
+												class="border-b border-l border-gray-200 bg-gray-50 p-2 text-center text-sm"
 											>
 												{formatDate(date)}
 											</div>
 										{/each}
 
+										<!-- Time Slots -->
 										{#each event?.timeSlots || [] as timeSlot}
-											<div class="border-b border-gray-200 p-3 text-sm text-gray-600">
+											<div class="border-b border-gray-200 p-2 text-sm text-gray-600">
 												{timeSlot}
 											</div>
 
 											{#each event?.dates || [] as date}
+												<!-- svelte-ignore a11y_consider_explicit_label -->
 												<button
 													type="button"
 													class="cursor-pointer border-b border-l border-gray-200 transition-colors duration-150 hover:bg-opacity-80"
 													class:bg-green-500={availability[date]?.[timeSlot]}
 													class:bg-gray-100={!availability[date]?.[timeSlot]}
 													onclick={() => toggleAvailability(date, timeSlot)}
-													onkeydown={(e) => {
-														if (e.key === 'Enter' || e.key === ' ') {
-															e.preventDefault();
-															toggleAvailability(date, timeSlot);
-														}
-													}}
-													role="gridcell"
-													aria-label={`Select availability for ${date} at ${timeSlot}`}
-													aria-selected={availability[date]?.[timeSlot]}
-													style="height: 40px;"
+													style="height: 32px;"
 												></button>
 											{/each}
 										{/each}
@@ -322,18 +353,13 @@
 					</div>
 
 					<!-- Group's Availability -->
-					<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-						<h2 class="mb-4 text-xl font-semibold">
-							Group's Availability ({event?.responses?.length || 0} responses)
-						</h2>
-						<div class="mb-6 flex items-center gap-6">
-							<div class="flex items-center">
-								<div class="mr-2 h-4 w-4 rounded border border-gray-300 bg-gray-100"></div>
-								<span class="text-sm">0% Available</span>
-							</div>
-							<div class="flex items-center">
-								<div class="mr-2 h-4 w-4 rounded border border-gray-300 bg-green-500"></div>
-								<span class="text-sm">100% Available</span>
+					<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+						<div class="mb-4 flex items-center justify-between">
+							<h2 class="text-lg font-semibold text-gray-800">
+								Group Availability ({event?.responses?.length || 0})
+							</h2>
+							<div class="flex items-center gap-4">
+								<span class="text-sm text-gray-500">0% → 100%</span>
 							</div>
 						</div>
 
@@ -343,32 +369,32 @@
 									<div
 										class="grid"
 										style="grid-template-columns: auto repeat({event?.dates?.length ||
-											0}, minmax(80px, 1fr))"
+											0}, minmax(60px, 1fr))"
 									>
-										<div class="border-b border-gray-200 bg-gray-50 p-3"></div>
-
+										<!-- Headers and time slots similar to individual availability -->
+										<div class="border-b border-gray-200 bg-gray-50 p-2"></div>
 										{#each event?.dates || [] as date}
 											<div
-												class="border-b border-l border-gray-200 bg-gray-50 p-3 text-center font-medium"
+												class="border-b border-l border-gray-200 bg-gray-50 p-2 text-center text-sm"
 											>
 												{formatDate(date)}
 											</div>
 										{/each}
 
 										{#each event?.timeSlots || [] as timeSlot}
-											<div class="border-b border-gray-200 p-3 text-sm text-gray-600">
+											<div class="border-b border-gray-200 p-2 text-sm text-gray-600">
 												{timeSlot}
 											</div>
 
 											{#each event?.dates || [] as date}
 												<div
 													class="border-b border-l border-gray-200"
-													style="height: 40px; background-color: rgba(34, 197, 94, {getGroupAvailability(
+													style="height: 32px; background-color: rgba(34, 197, 94, {getGroupAvailability(
 														date,
 														timeSlot
 													) / 100})"
-													title={`${getGroupAvailability(date, timeSlot)}% available at ${timeSlot}`}
-												/>
+													title={`${getGroupAvailability(date, timeSlot)}% available`}
+												></div>
 											{/each}
 										{/each}
 									</div>
@@ -377,140 +403,78 @@
 						</div>
 					</div>
 				</div>
+			</div>
+		{/if}
 
-				<!-- Participants List Section -->
-				<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-					<h2 class="mb-4 text-xl font-semibold">Participants ({participants.length})</h2>
+		<!-- Participant Availability Modal -->
+		{#if selectedParticipant}
+			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+				<div class="w-full max-w-2xl rounded-lg bg-white p-6">
+					<div class="mb-4 flex items-center justify-between">
+						<h3 class="text-lg font-semibold">
+							{selectedParticipant.name}'s Availability
+						</h3>
+						<!-- svelte-ignore a11y_consider_explicit_label -->
+						<button
+							class="rounded-full p-1 hover:bg-gray-100"
+							onclick={() => (selectedParticipant = null)}
+						>
+							<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									stroke-width="2"
+									d="M6 18L18 6M6 6l12 12"
+								/>
+							</svg>
+						</button>
+					</div>
 
 					<div class="overflow-x-auto">
-						<table class="min-w-full divide-y divide-gray-200">
-							<thead class="bg-gray-50">
-								<tr>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-									>
-										Name
-									</th>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-									>
-										Timezone
-									</th>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-									>
-										Last Updated
-									</th>
-									<th
-										class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
-									>
-										Actions
-									</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-gray-200 bg-white">
-								{#each participants as participant}
-									<tr>
-										<td class="whitespace-nowrap px-6 py-4">
-											<div class="text-sm font-medium text-gray-900">
-												{participant.name}
-											</div>
-										</td>
-										<td class="whitespace-nowrap px-6 py-4">
-											<div class="text-sm text-gray-500">
-												{participant.timezone || 'Unknown'}
-											</div>
-										</td>
-										<td class="whitespace-nowrap px-6 py-4">
-											<div class="text-sm text-gray-500">
-												{formatDateTime(participant.lastUpdated)}
-											</div>
-										</td>
-										<td class="whitespace-nowrap px-6 py-4">
-											<button
-												class="rounded bg-blue-500 px-3 py-1 text-sm text-white hover:bg-blue-600"
-												onclick={() => viewParticipantAvailability(participant)}
-											>
-												View Availability
-											</button>
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				</div>
-
-				<!-- Selected Participant's Availability Modal -->
-				{#if selectedParticipant}
-					<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-						<div class="w-full max-w-4xl rounded-lg bg-white p-6">
-							<div class="mb-4 flex items-center justify-between">
-								<h3 class="text-lg font-semibold">
-									{selectedParticipant.name}'s Availability
-								</h3>
-								<!-- svelte-ignore a11y_consider_explicit_label -->
-								<button
-									class="rounded-full p-1 hover:bg-gray-100"
-									onclick={() => (selectedParticipant = null)}
+						<div class="inline-block min-w-full align-middle">
+							<div class="overflow-hidden rounded-lg border border-gray-200">
+								<div
+									class="grid"
+									style="grid-template-columns: auto repeat({event?.dates?.length ||
+										0}, minmax(60px, 1fr))"
 								>
-									<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M6 18L18 6M6 6l12 12"
-										/>
-									</svg>
-								</button>
-							</div>
-
-							<div class="overflow-x-auto">
-								<div class="inline-block min-w-full align-middle">
-									<div class="overflow-hidden rounded-lg border border-gray-200">
+									<!-- Same grid structure as above but with participant's availability -->
+									<div class="border-b border-gray-200 bg-gray-50 p-2"></div>
+									{#each event?.dates || [] as date}
 										<div
-											class="grid"
-											style="grid-template-columns: auto repeat({event?.dates?.length ||
-												0}, minmax(80px, 1fr))"
+											class="border-b border-l border-gray-200 bg-gray-50 p-2 text-center text-sm"
 										>
-											<div class="border-b border-gray-200 bg-gray-50 p-3"></div>
-											{#each event?.dates || [] as date}
-												<div
-													class="border-b border-l border-gray-200 bg-gray-50 p-3 text-center font-medium"
-												>
-													{formatDate(date)}
-												</div>
-											{/each}
-
-											{#each event?.timeSlots || [] as timeSlot}
-												<div class="border-b border-gray-200 p-3 text-sm text-gray-600">
-													{timeSlot}
-												</div>
-
-												{#each event?.dates || [] as date}
-													<div
-														class="border-b border-l border-gray-200"
-														class:bg-green-500={getParticipantAvailability(
-															selectedParticipant,
-															date,
-															timeSlot
-														)}
-														class:bg-gray-100={!getParticipantAvailability(
-															selectedParticipant,
-															date,
-															timeSlot
-														)}
-														style="height: 40px;"
-													></div>
-												{/each}
-											{/each}
+											{formatDate(date)}
 										</div>
-									</div>
+									{/each}
+
+									{#each event?.timeSlots || [] as timeSlot}
+										<div class="border-b border-gray-200 p-2 text-sm text-gray-600">
+											{timeSlot}
+										</div>
+
+										{#each event?.dates || [] as date}
+											<div
+												class="border-b border-l border-gray-200"
+												class:bg-green-500={getParticipantAvailability(
+													selectedParticipant,
+													date,
+													timeSlot
+												)}
+												class:bg-gray-100={!getParticipantAvailability(
+													selectedParticipant,
+													date,
+													timeSlot
+												)}
+												style="height: 32px;"
+											></div>
+										{/each}
+									{/each}
 								</div>
 							</div>
 						</div>
 					</div>
-				{/if}
+				</div>
 			</div>
 		{/if}
 	</main>
