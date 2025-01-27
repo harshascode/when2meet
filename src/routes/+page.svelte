@@ -182,7 +182,7 @@
 	}
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+<div class="min-h-screen bg-gradient-to-br from-gray-50 to-white">
 	<Header />
 
 	<main class="container mx-auto max-w-6xl px-4 py-8">
@@ -190,76 +190,69 @@
 			<input
 				type="text"
 				placeholder="Enter event name"
-				class="w-full rounded-xl border border-gray-200 bg-white/80 px-6 py-4
-                    text-center text-xl shadow-sm backdrop-blur-sm
-                    transition-all duration-200 focus:border-blue-500
-                    focus:ring-2 focus:ring-blue-500"
+				class="w-full rounded-lg border border-gray-300 bg-white px-6 py-4
+					text-center text-2xl font-medium text-gray-900 placeholder-gray-400
+					transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
 				bind:value={eventName}
 			/>
 		</div>
 
 		<div class="grid gap-6 lg:grid-cols-2">
 			<!-- Calendar Card -->
-			<div class="rounded-xl border border-gray-200 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
+			<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-xs">
 				<div class="mb-6 flex items-center justify-between">
 					<button
-						class="rounded-lg p-2 transition-colors hover:bg-gray-100"
+						class="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
 						aria-label="Previous Month"
 						onclick={navigationHandlers.previousMonth}
 					>
 						<svg
-							class="h-5 w-5 text-gray-600"
+							class="h-5 w-5"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
+							stroke-width="2"
 						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M15 19l-7-7 7-7"
-							/>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
 						</svg>
 					</button>
 
-					<h2 class="text-xl font-medium text-gray-800">
+					<h2 class="text-lg font-semibold text-gray-900">
 						{format(currentMonth, 'MMMM yyyy')}
 					</h2>
 
 					<button
-						class="rounded-lg p-2 transition-colors hover:bg-gray-100"
+						class="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
 						aria-label="Next Month"
 						onclick={navigationHandlers.nextMonth}
 					>
 						<svg
-							class="h-5 w-5 text-gray-600"
+							class="h-5 w-5"
 							fill="none"
 							viewBox="0 0 24 24"
 							stroke="currentColor"
+							stroke-width="2"
 						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M9 5l7 7-7 7"
-							/>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
 						</svg>
 					</button>
 				</div>
 
 				<div class="grid grid-cols-7 gap-1">
-					{#each ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as day}
-						<div class="py-2 text-center text-sm font-medium text-gray-500">{day}</div>
+					{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day}
+						<div class="py-2 text-center text-xs font-medium uppercase text-gray-500">
+							{day}
+						</div>
 					{/each}
 
 					{#each calendarDays as day (day.date.getTime())}
 						<button
-							class="aspect-square rounded-lg text-sm font-medium
+							class="aspect-square rounded-md text-sm font-medium
                                 {!day.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
-                                {day.isToday ? 'ring-2 ring-blue-400' : ''}
+                                {day.isToday ? 'ring-2 ring-blue-500' : ''}
                                 {selectedDatesSet.has(day.date.getTime())
-								? 'bg-blue-500 text-white hover:bg-blue-600'
-								: 'hover:bg-blue-50'}"
+									? 'bg-blue-600 text-white hover:bg-blue-700'
+									: 'hover:bg-blue-50'}"
 							onclick={() => toggleDateSelection(day.date)}
 						>
 							{day.dayLabel}
@@ -270,7 +263,7 @@
 				{#if selectedDates.length > 0}
 					<div class="mt-4 flex flex-wrap gap-2">
 						{#each sortedSelectedDates as date}
-							<span class="rounded-full bg-blue-100 px-3 py-1 text-sm text-blue-700">
+							<span class="rounded-md bg-blue-100 px-2.5 py-1 text-sm text-blue-700">
 								{format(date, 'MMM d')}
 							</span>
 						{/each}
@@ -279,15 +272,17 @@
 			</div>
 
 			<!-- Time Selection Card -->
-			<div class="rounded-xl border border-gray-200 bg-white/80 p-6 shadow-sm backdrop-blur-sm">
+			<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-xs">
 				<div class="mb-6 grid grid-cols-2 gap-4">
 					<div>
-						<label for="startTime" class="mb-1 block text-sm text-gray-600">Start Time</label>
+						<label for="startTime" class="mb-2 block text-sm font-medium text-gray-700"
+							>Start Time</label
+						>
 						<select
 							id="startTime"
 							bind:value={startTime}
-							class="w-full rounded-lg border border-gray-200 px-3 py-2
-								focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+							class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
+								text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
 						>
 							{#each timeSlots as timeOption}
 								<option value={timeOption.time}>{timeOption.formatted}</option>
@@ -295,12 +290,14 @@
 						</select>
 					</div>
 					<div>
-						<label for="endTime" class="mb-1 block text-sm text-gray-600">End Time</label>
+						<label for="endTime" class="mb-2 block text-sm font-medium text-gray-700"
+							>End Time</label
+						>
 						<select
 							id="endTime"
 							bind:value={endTime}
-							class="w-full rounded-lg border border-gray-200 px-3 py-2
-								focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+							class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
+								text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
 						>
 							{#each timeSlots as timeOption}
 								<option value={timeOption.time}>{timeOption.formatted}</option>
@@ -310,12 +307,14 @@
 				</div>
 
 				<div class="mb-6">
-					<label for="timezone" class="mb-1 block text-sm text-gray-600">Time Zone</label>
+					<label for="timezone" class="mb-2 block text-sm font-medium text-gray-700"
+						>Time Zone</label
+					>
 					<select
 						id="timezone"
 						bind:value={selectedTimeZone}
-						class="w-full rounded-lg border border-gray-200 px-3 py-2
-                            focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+						class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
+							text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
 					>
 						{#each timeZones as tz}
 							<option value={tz.value}>{tz.label}</option>
@@ -326,10 +325,10 @@
 				<div class="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
 					{#each timeSlots as timeSlot (timeSlot.time)}
 						<button
-							class="rounded-lg px-4 py-2 text-sm font-medium
+							class="rounded-md px-3 py-2 text-sm font-medium transition-colors
                                 {selectedTimesSet.has(timeSlot.time)
-								? 'bg-blue-500 text-white hover:bg-blue-600'
-								: 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
+									? 'bg-blue-600 text-white hover:bg-blue-700'
+									: 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
 							onclick={() => toggleTimeSelection(timeSlot.time)}
 						>
 							{timeSlot.formatted}
@@ -342,9 +341,10 @@
 		<div class="mt-8 text-center">
 			<button
 				onclick={handleSubmit}
-				class="rounded-xl bg-blue-600 px-8 py-3 text-lg font-medium text-white
-                    transition-colors hover:bg-blue-700
-                    disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded-md bg-blue-600 px-8 py-3 text-sm font-semibold text-white
+					shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline
+					focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600
+					disabled:cursor-not-allowed disabled:opacity-50"
 				disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
 			>
 				Create Event

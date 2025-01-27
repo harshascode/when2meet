@@ -26,3 +26,4 @@ vite.config.ts.timestamp-*
 *.db
 /events.db-shm
 /events.db-wal
+
