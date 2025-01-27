@@ -73,3 +73,15 @@
 		@apply bg-background text-foreground;
 	}
 }
+
+.availability-scrollbar::-webkit-scrollbar {
+	height: 6px;
+}
+
+.availability-scrollbar::-webkit-scrollbar-thumb {
+	@apply bg-gray-300 rounded-full;
+}
+
+.availability-scrollbar::-webkit-scrollbar-track {
+	@apply bg-gray-100;
+}
