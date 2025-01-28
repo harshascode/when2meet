@@ -43,9 +43,13 @@
 	let participants: Participant[] = $state([]);
 	let selectedParticipant: Participant | null = $state(null);
 	let isDragging = $state(false);
-	let startCell = $state<{ date: string; timeSlot: string } | null>(null);
-	let currentCell = $state<{ date: string; timeSlot: string } | null>(null);
 	let nameError = $state(false);
+
+	// Drag selection states
+	let dragSelection = $state<{
+		start: { date: string; timeSlot: string } | null;
+		end: { date: string; timeSlot: string } | null;
+	}>({ start: null, end: null });
 
 	const timezones = Intl.supportedValuesOf('timeZone');
 
@@ -101,29 +105,65 @@
 		return new Date(dateStr).toLocaleString();
 	}
 
-	// function startDrag(date: string, timeSlot: string) {
-	// 	if (!participantName) {
-	// 		nameError = true;
-	// 		const nameInput = document.getElementById('participantName');
-	// 		nameInput?.focus();
-	// 		return;
-	// 	}
+	function startDrag(date: string, timeSlot: string) {
+		if (!participantName) {
+			nameError = true;
+			const nameInput = document.getElementById('participantName');
+			nameInput?.focus();
+			return;
+		}
 
-	// 	isDragging = true;
-	// 	nameError = false;
-	// 	startCell = { date, timeSlot };
-	// 	currentCell = { date, timeSlot };
-	// 	toggleAvailability(date, timeSlot);
-	// 	window.addEventListener('mouseup', globalStopDrag);
-	// }
+		isDragging = true;
+		nameError = false;
+		dragSelection.start = { date, timeSlot };
+		dragSelection.end = { date, timeSlot };
+		window.addEventListener('mouseup', globalStopDrag);
+	}
 
-	// function handleDrag(date: string, timeSlot: string) {
-	// 	if (!isDragging || !participantName) return;
-	// 	if (currentCell?.date === date && currentCell?.timeSlot === timeSlot) return;
+	function handleDrag(date: string, timeSlot: string) {
+		if (!isDragging || !participantName) return;
+		dragSelection.end = { date, timeSlot };
+	}
 
-	// 	currentCell = { date, timeSlot };
-	// 	toggleAvailability(date, timeSlot);
-	// }
+	function stopDrag() {
+		if (isDragging) {
+			isDragging = false;
+			
+			if (dragSelection.start && dragSelection.end) {
+				const dates = event?.dates || [];
+				const timeSlots = event?.timeSlots || [];
+				const startDateIdx = dates.indexOf(dragSelection.start.date);
+				const endDateIdx = dates.indexOf(dragSelection.end.date);
+				const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
+				const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
+
+				const minDateIdx = Math.min(startDateIdx, endDateIdx);
+				const maxDateIdx = Math.max(startDateIdx, endDateIdx);
+				const minTimeIdx = Math.min(startTimeIdx, endTimeIdx);
+				const maxTimeIdx = Math.max(startTimeIdx, endTimeIdx);
+
+				const currentState = availability[dragSelection.start.date][dragSelection.start.timeSlot];
+
+				for (let d = minDateIdx; d <= maxDateIdx; d++) {
+					for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
+						const date = dates[d];
+						const timeSlot = timeSlots[t];
+						availability[date][timeSlot] = !currentState;
+					}
+				}
+
+				saveAvailability();
+			}
+
+			dragSelection.start = null;
+			dragSelection.end = null;
+			window.removeEventListener('mouseup', globalStopDrag);
+		}
+	}
+
+	function globalStopDrag() {
+		stopDrag();
+	}
 
 	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
 		if (!isDragging) return;
@@ -135,51 +175,27 @@
 		}
 	}
 
-	// function stopDrag() {
-	// 	if (isDragging) {
-	// 		isDragging = false;
-	// 		startCell = null;
-	// 		currentCell = null;
-	// 		window.removeEventListener('mouseup', globalStopDrag);
-	// 	}
-	// }
+	function isInDragSelection(date: string, timeSlot: string): boolean {
+		if (!dragSelection.start || !dragSelection.end) return false;
 
-	function globalStopDrag() {
-		stopDrag();
+		const dates = event?.dates || [];
+		const timeSlots = event?.timeSlots || [];
+		
+		const startDateIdx = dates.indexOf(dragSelection.start.date);
+		const endDateIdx = dates.indexOf(dragSelection.end.date);
+		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
+		const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
+
+		const currentDateIdx = dates.indexOf(date);
+		const currentTimeIdx = timeSlots.indexOf(timeSlot);
+
+		return (
+			currentDateIdx >= Math.min(startDateIdx, endDateIdx) &&
+			currentDateIdx <= Math.max(startDateIdx, endDateIdx) &&
+			currentTimeIdx >= Math.min(startTimeIdx, endTimeIdx) &&
+			currentTimeIdx <= Math.max(startTimeIdx, endTimeIdx)
+		);
 	}
-
-	// function toggleAvailability(date: string, timeSlot: string) {
-	// 	if (!isDragging || !startCell || !participantName) return;
-
-	// 	const dates = event?.dates || [];
-	// 	const timeSlots = event?.timeSlots || [];
-	// 	const startDateIndex = dates.indexOf(startCell.date);
-	// 	const endDateIndex = dates.indexOf(date);
-	// 	const startTimeIndex = timeSlots.indexOf(startCell.timeSlot);
-	// 	const endTimeIndex = timeSlots.indexOf(timeSlot);
-
-	// 	const minDateIndex = Math.min(startDateIndex, endDateIndex);
-	// 	const maxDateIndex = Math.max(startDateIndex, endDateIndex);
-	// 	const minTimeIndex = Math.min(startTimeIndex, endTimeIndex);
-	// 	const maxTimeIndex = Math.max(startTimeIndex, endTimeIndex);
-
-	// 	const currentState = availability[startCell.date][startCell.timeSlot];
-	// 	const changes = [];
-
-	// 	for (let d = minDateIndex; d <= maxDateIndex; d++) {
-	// 		for (let t = minTimeIndex; t <= maxTimeIndex; t++) {
-	// 			const currentDate = dates[d];
-	// 			const currentTime = timeSlots[t];
-	// 			changes.push({ date: currentDate, time: currentTime, state: !currentState });
-	// 		}
-	// 	}
-
-	// 	changes.forEach(({ date, time, state }) => {
-	// 		availability[date][time] = state;
-	// 	});
-
-	// 	saveAvailability();
-	// }
 
 	async function saveAvailability() {
 		if (!participantName) {
@@ -243,15 +259,11 @@
 	function getGroupAvailability(date: string, timeSlot: string): number {
 		if (!event?.responses) return 0;
 
-		// Get unique participants
 		const uniqueParticipants = new Set(event.responses.map((r) => r.participant_name));
-
-		// Count responses for this specific date and time slot
 		const responsesForSlot = event.responses.filter(
 			(r: Response) => r.date === date && r.time_slot === timeSlot
 		);
 
-		// Calculate percentage based on unique participants
 		return (responsesForSlot.length / (uniqueParticipants.size || 1)) * 100;
 	}
 
@@ -265,89 +277,6 @@
 
 	function viewParticipantAvailability(participant: Participant): void {
 		selectedParticipant = participant;
-	}
-
-	// page added by me
-
-	// Add a temporary state for drag selection
-	let tempSelection = $state<{ [date: string]: { [timeSlot: string]: boolean } }>({});
-
-	// Modify startDrag function
-	function startDrag(date: string, timeSlot: string) {
-		if (!participantName) {
-			nameError = true;
-			const nameInput = document.getElementById('participantName');
-			nameInput?.focus();
-			return;
-		}
-
-		isDragging = true;
-		nameError = false;
-		startCell = { date, timeSlot };
-		currentCell = { date, timeSlot };
-
-		// Initialize tempSelection with the current state
-		tempSelection = JSON.parse(JSON.stringify(availability));
-		toggleAvailability(date, timeSlot, true); // Pass true to indicate drag start
-		window.addEventListener('mouseup', globalStopDrag);
-	}
-
-	// Modify handleDrag function
-	function handleDrag(date: string, timeSlot: string) {
-		if (!isDragging || !participantName) return;
-		if (currentCell?.date === date && currentCell?.timeSlot === timeSlot) return;
-
-		currentCell = { date, timeSlot };
-		toggleAvailability(date, timeSlot, false); // Pass false to indicate drag in progress
-	}
-
-	// Modify toggleAvailability function
-	function toggleAvailability(date: string, timeSlot: string, isStart: boolean) {
-		if (!isDragging || !startCell || !participantName) return;
-
-		const dates = event?.dates || [];
-		const timeSlots = event?.timeSlots || [];
-		const startDateIndex = dates.indexOf(startCell.date);
-		const endDateIndex = dates.indexOf(date);
-		const startTimeIndex = timeSlots.indexOf(startCell.timeSlot);
-		const endTimeIndex = timeSlots.indexOf(timeSlot);
-
-		const minDateIndex = Math.min(startDateIndex, endDateIndex);
-		const maxDateIndex = Math.max(startDateIndex, endDateIndex);
-		const minTimeIndex = Math.min(startTimeIndex, endTimeIndex);
-		const maxTimeIndex = Math.max(startTimeIndex, endTimeIndex);
-
-		const currentState = tempSelection[startCell.date][startCell.timeSlot];
-
-		// Update tempSelection
-		for (let d = minDateIndex; d <= maxDateIndex; d++) {
-			for (let t = minTimeIndex; t <= maxTimeIndex; t++) {
-				const currentDate = dates[d];
-				const currentTime = timeSlots[t];
-				tempSelection[currentDate][currentTime] = !currentState;
-			}
-		}
-
-		// If this is the start of the drag, update the UI immediately
-		if (isStart) {
-			availability = JSON.parse(JSON.stringify(tempSelection));
-		}
-	}
-
-	// Modify stopDrag function
-	function stopDrag() {
-		if (isDragging) {
-			isDragging = false;
-			startCell = null;
-			currentCell = null;
-
-			// Apply the final selection
-			availability = JSON.parse(JSON.stringify(tempSelection));
-			tempSelection = {};
-
-			saveAvailability();
-			window.removeEventListener('mouseup', globalStopDrag);
-		}
 	}
 </script>
 
@@ -498,7 +427,7 @@
 												{#each event?.dates || [] as date}
 													<button
 														type="button"
-														class="h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
+														class="h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none relative"
 														class:bg-green-500={availability[date]?.[timeSlot]}
 														class:bg-gray-100={!availability[date]?.[timeSlot]}
 														class:cursor-pointer={participantName}
@@ -511,7 +440,11 @@
 														ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
 														ontouchend={stopDrag}
 													>
-														<div class="pointer-events-none h-full w-full" />
+														<div class="pointer-events-none h-full w-full">
+															{#if isInDragSelection(date, timeSlot)}
+																<div class="absolute inset-0 bg-blue-200 opacity-50" />
+															{/if}
+														</div>
 													</button>
 												{/each}
 											{/each}
@@ -521,7 +454,6 @@
 							</div>
 						</div>
 
-						<!-- Group Availability -->
 						<!-- Group Availability -->
 						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 							<div class="mb-6 flex items-center justify-between">
@@ -651,3 +583,27 @@
 
 	<Footer />
 </div>
+
+<style>
+	.relative {
+		position: relative;
+	}
+	.absolute {
+		position: absolute;
+	}
+	.inset-0 {
+		top: 0;
+		right: 0;
+		bottom: 0;
+		left: 0;
+	}
+	.opacity-50 {
+		opacity: 0.5;
+	}
+	.pointer-events-none {
+		pointer-events: none;
+	}
+	.bg-blue-200 {
+		background-color: #bfdbfe;
+	}
+</style>
