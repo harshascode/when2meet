@@ -47,6 +47,8 @@
 	let mouseX = $state(0);
 	let mouseY = $state(0);
 
+	let isMobile = $state(false);
+
 	// Drag selection states
 	let dragSelection = $state<{
 		start: { date: string; timeSlot: string } | null;
@@ -149,6 +151,11 @@
 		}
 	});
 
+	onMount(() => {
+		// Check if we're on mobile
+		isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+	});
+
 	function formatDate(dateStr: string) {
 		const date = new Date(dateStr);
 		return format(date, 'MMM d\nEEE');
@@ -195,13 +202,14 @@
 				const minTimeIdx = Math.min(startTimeIdx, endTimeIdx);
 				const maxTimeIdx = Math.max(startTimeIdx, endTimeIdx);
 
+				// Get the state from the first cell to determine what to set all cells to
 				const currentState = availability[dragSelection.start.date][dragSelection.start.timeSlot];
 
 				for (let d = minDateIdx; d <= maxDateIdx; d++) {
 					for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
 						const date = dates[d];
 						const timeSlot = timeSlots[t];
-						availability[date][timeSlot] = !currentState;
+						availability[date][timeSlot] = !currentState; // Toggle the state
 					}
 				}
 
@@ -492,14 +500,68 @@
 														class:cursor-pointer={participantName}
 														class:cursor-not-allowed={!participantName}
 														class:hover:bg-opacity-90={participantName}
-														onmousedown={() => startDrag(date, timeSlot)}
+														onmousedown={(e) => {
+															if (!participantName) {
+																nameError = true;
+																const nameInput = document.getElementById('participantName');
+																nameInput?.focus();
+																return;
+															}
+
+															// Detect if it's the start of a drag or a click
+															const startTime = new Date().getTime();
+															const startX = e.clientX;
+															const startY = e.clientY;
+
+															const onMouseUp = (upEvent: MouseEvent) => {
+																const endTime = new Date().getTime();
+																const endX = upEvent.clientX;
+																const endY = upEvent.clientY;
+
+																// Calculate distance moved
+																const distance = Math.sqrt(
+																	Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2)
+																);
+
+																// If it's a quick click (less than 200ms) and barely moved (less than 5px)
+																if (endTime - startTime < 200 && distance < 5) {
+																	// Handle as a click
+																	availability[date][timeSlot] = !availability[date][timeSlot];
+																	saveAvailability();
+																}
+
+																document.removeEventListener('mouseup', onMouseUp);
+															};
+
+															document.addEventListener('mouseup', onMouseUp);
+
+															// Start drag if mouse is held
+															if (e.buttons === 1) {
+																e.preventDefault();
+																startDrag(date, timeSlot);
+															}
+														}}
 														onmouseover={() => handleCellHover(date, timeSlot)}
 														onmouseout={handleCellLeave}
-														onmouseenter={() => handleDrag(date, timeSlot)}
+														onmouseenter={() => {
+															if (isDragging) {
+																handleDrag(date, timeSlot);
+															}
+														}}
 														onmouseup={stopDrag}
-														ontouchstart={() => startDrag(date, timeSlot)}
-														ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
-														ontouchend={stopDrag}
+														ontouchstart={(e) => {
+															e.preventDefault();
+															if (participantName) {
+																// For touch devices, just toggle the cell
+																const newValue = !availability[date][timeSlot];
+																availability[date][timeSlot] = newValue;
+																saveAvailability();
+															} else {
+																nameError = true;
+																const nameInput = document.getElementById('participantName');
+																nameInput?.focus();
+															}
+														}}
 													>
 														<div class="pointer-events-none h-full w-full">
 															{#if isInDragSelection(date, timeSlot)}
@@ -572,7 +634,8 @@
 		{/if}
 
 		<!-- Hover Tooltip -->
-		{#if hoveredCell}
+		<!-- Hover Tooltip -->
+		{#if hoveredCell && !('ontouchstart' in window)}
 			{@const participants = getParticipantsForSlot(hoveredCell.date, hoveredCell.timeSlot)}
 			<div
 				class="z-50 min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg md:fixed"
