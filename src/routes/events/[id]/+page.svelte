@@ -44,6 +44,8 @@
 	let selectedParticipant: Participant | null = $state(null);
 	let isDragging = $state(false);
 	let nameError = $state(false);
+	let mouseX = $state(0);
+	let mouseY = $state(0);
 
 	// Drag selection states
 	let dragSelection = $state<{
@@ -51,7 +53,55 @@
 		end: { date: string; timeSlot: string } | null;
 	}>({ start: null, end: null });
 
+	// Hover states
+	let hoveredCell = $state<{ date: string; timeSlot: string } | null>(null);
+	let hoverTimeout: number | null = $state(null);
+
 	const timezones = Intl.supportedValuesOf('timeZone');
+
+	function trackMousePosition(event: MouseEvent) {
+		mouseX = event.clientX;
+		mouseY = event.clientY;
+	}
+
+	function getParticipantsForSlot(date: string, timeSlot: string): { available: string[]; unavailable: string[] } {
+		if (!event?.responses) return { available: [], unavailable: [] };
+
+		const available = new Set<string>();
+		const allParticipants = new Set<string>();
+
+		event.responses.forEach((response) => {
+			allParticipants.add(response.participant_name);
+			if (response.date === date && response.time_slot === timeSlot) {
+				available.add(response.participant_name);
+			}
+		});
+
+		const unavailable = Array.from(allParticipants).filter(
+			(participant) => !available.has(participant)
+		);
+
+		return {
+			available: Array.from(available),
+			unavailable: unavailable
+		};
+	}
+
+	function handleCellHover(date: string, timeSlot: string) {
+		if (hoverTimeout) {
+			clearTimeout(hoverTimeout);
+		}
+		hoverTimeout = setTimeout(() => {
+			hoveredCell = { date, timeSlot };
+		}, 200);
+	}
+
+	function handleCellLeave() {
+		if (hoverTimeout) {
+			clearTimeout(hoverTimeout);
+		}
+		hoveredCell = null;
+	}
 
 	onMount(async () => {
 		try {
@@ -280,7 +330,7 @@
 	}
 </script>
 
-<div class="flex min-h-screen flex-col bg-white">
+<div class="flex min-h-screen flex-col bg-white" on:mousemove={trackMousePosition}>
 	<Header />
 
 	<main class="container mx-auto max-w-7xl flex-1 px-4 py-8">
@@ -434,7 +484,9 @@
 														class:cursor-not-allowed={!participantName}
 														class:hover:bg-opacity-90={participantName}
 														onmousedown={() => startDrag(date, timeSlot)}
-														onmouseover={() => handleDrag(date, timeSlot)}
+														onmouseover={() => handleCellHover(date, timeSlot)}
+														onmouseout={handleCellLeave}
+														onmouseenter={() => handleDrag(date, timeSlot)}
 														onmouseup={stopDrag}
 														ontouchstart={() => startDrag(date, timeSlot)}
 														ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
@@ -505,6 +557,53 @@
 								</div>
 							</div>
 						</div>
+					</div>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Hover Tooltip -->
+		{#if hoveredCell}
+			{#const participants = getParticipantsForSlot(hoveredCell.date, hoveredCell.timeSlot)}
+			<div
+				class="fixed z-50 min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
+				style="top: {mouseY + 10}px; left: {mouseX + 10}px"
+			>
+				<h4 class="mb-3 text-sm font-semibold text-gray-900">
+					{formatDate(hoveredCell.date)} at {hoveredCell.timeSlot}
+				</h4>
+				
+				<div class="space-y-3">
+					<div>
+						<h5 class="mb-1 text-xs font-medium text-green-600">Available ({participants.available.length})</h5>
+						{#if participants.available.length > 0}
+							<div class="space-y-1">
+								{#each participants.available as participant}
+									<div class="flex items-center gap-2 text-sm text-gray-700">
+										<div class="h-2 w-2 rounded-full bg-green-500"></div>
+										<span>{participant}</span>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="text-sm text-gray-500">No participants available</p>
+						{/if}
+					</div>
+
+					<div>
+						<h5 class="mb-1 text-xs font-medium text-red-600">Unavailable ({participants.unavailable.length})</h5>
+						{#if participants.unavailable.length > 0}
+							<div class="space-y-1">
+								{#each participants.unavailable as participant}
+									<div class="flex items-center gap-2 text-sm text-gray-700">
+										<div class="h-2 w-2 rounded-full bg-red-500"></div>
+										<span>{participant}</span>
+									</div>
+								{/each}
+							</div>
+						{:else}
+							<p class="text-sm text-gray-500">All participants available</p>
+						{/if}
 					</div>
 				</div>
 			</div>
@@ -605,5 +704,20 @@
 	}
 	.bg-blue-200 {
 		background-color: #bfdbfe;
+	}
+	.fixed {
+		position: fixed;
+	}
+	.z-50 {
+		z-index: 50;
+	}
+	.shadow-lg {
+		box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+	}
+	.rounded-lg {
+		border-radius: 0.5rem;
+	}
+	.min-w-\[300px\] {
+		min-width: 300px;
 	}
 </style>
