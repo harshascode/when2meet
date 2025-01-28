@@ -55,7 +55,7 @@
 
 	// Hover states
 	let hoveredCell = $state<{ date: string; timeSlot: string } | null>(null);
-	let hoverTimeout: number | null = $state(null);
+	let hoverTimeout: any | null = $state(null);
 
 	const timezones = Intl.supportedValuesOf('timeZone');
 
@@ -64,7 +64,10 @@
 		mouseY = event.clientY;
 	}
 
-	function getParticipantsForSlot(date: string, timeSlot: string): { available: string[]; unavailable: string[] } {
+	function getParticipantsForSlot(
+		date: string,
+		timeSlot: string
+	): { available: string[]; unavailable: string[] } {
 		if (!event?.responses) return { available: [], unavailable: [] };
 
 		const available = new Set<string>();
@@ -178,7 +181,7 @@
 	function stopDrag() {
 		if (isDragging) {
 			isDragging = false;
-			
+
 			if (dragSelection.start && dragSelection.end) {
 				const dates = event?.dates || [];
 				const timeSlots = event?.timeSlots || [];
@@ -230,7 +233,7 @@
 
 		const dates = event?.dates || [];
 		const timeSlots = event?.timeSlots || [];
-		
+
 		const startDateIdx = dates.indexOf(dragSelection.start.date);
 		const endDateIdx = dates.indexOf(dragSelection.end.date);
 		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
@@ -330,7 +333,11 @@
 	}
 </script>
 
-<div class="flex min-h-screen flex-col bg-white" on:mousemove={trackMousePosition}>
+<div
+	class="flex min-h-screen flex-col bg-white"
+	onmousemove={trackMousePosition}
+	role="presentation"
+>
 	<Header />
 
 	<main class="container mx-auto max-w-7xl flex-1 px-4 py-8">
@@ -359,7 +366,7 @@
 					</div>
 				</div>
 
-				<div class="grid gap-8 lg:grid-cols-3">
+				<div class="">
 					<!-- Left Sidebar -->
 					<div class="space-y-8 lg:col-span-1">
 						<!-- User Info -->
@@ -394,6 +401,7 @@
 									{/if}
 								</div>
 								<div>
+									<!-- svelte-ignore a11y_label_has_associated_control -->
 									<label class="mb-1 block text-sm font-medium text-gray-700">Time Zone</label>
 									<select
 										bind:value={timezone}
@@ -475,9 +483,10 @@
 													{timeSlot}
 												</div>
 												{#each event?.dates || [] as date}
+													<!-- svelte-ignore a11y_mouse_events_have_key_events -->
 													<button
 														type="button"
-														class="h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none relative"
+														class="relative h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
 														class:bg-green-500={availability[date]?.[timeSlot]}
 														class:bg-gray-100={!availability[date]?.[timeSlot]}
 														class:cursor-pointer={participantName}
@@ -494,7 +503,7 @@
 													>
 														<div class="pointer-events-none h-full w-full">
 															{#if isInDragSelection(date, timeSlot)}
-																<div class="absolute inset-0 bg-blue-200 opacity-50" />
+																<div class="absolute inset-0 bg-blue-200 opacity-50"></div>
 															{/if}
 														</div>
 													</button>
@@ -564,18 +573,20 @@
 
 		<!-- Hover Tooltip -->
 		{#if hoveredCell}
-			{#const participants = getParticipantsForSlot(hoveredCell.date, hoveredCell.timeSlot)}
+			{@const participants = getParticipantsForSlot(hoveredCell.date, hoveredCell.timeSlot)}
 			<div
-				class="fixed z-50 min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg"
+				class="z-50 min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg md:fixed"
 				style="top: {mouseY + 10}px; left: {mouseX + 10}px"
 			>
 				<h4 class="mb-3 text-sm font-semibold text-gray-900">
 					{formatDate(hoveredCell.date)} at {hoveredCell.timeSlot}
 				</h4>
-				
+
 				<div class="space-y-3">
 					<div>
-						<h5 class="mb-1 text-xs font-medium text-green-600">Available ({participants.available.length})</h5>
+						<h5 class="mb-1 text-xs font-medium text-green-600">
+							Available ({participants.available.length})
+						</h5>
 						{#if participants.available.length > 0}
 							<div class="space-y-1">
 								{#each participants.available as participant}
@@ -591,7 +602,9 @@
 					</div>
 
 					<div>
-						<h5 class="mb-1 text-xs font-medium text-red-600">Unavailable ({participants.unavailable.length})</h5>
+						<h5 class="mb-1 text-xs font-medium text-red-600">
+							Unavailable ({participants.unavailable.length})
+						</h5>
 						{#if participants.unavailable.length > 0}
 							<div class="space-y-1">
 								{#each participants.unavailable as participant}
@@ -617,6 +630,7 @@
 						<h3 class="text-xl font-bold text-gray-900">
 							{selectedParticipant.name}'s Availability
 						</h3>
+						<!-- svelte-ignore a11y_consider_explicit_label -->
 						<button
 							class="rounded-lg p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
 							onclick={() => (selectedParticipant = null)}
@@ -712,7 +726,9 @@
 		z-index: 50;
 	}
 	.shadow-lg {
-		box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+		box-shadow:
+			0 10px 15px -3px rgb(0 0 0 / 0.1),
+			0 4px 6px -4px rgb(0 0 0 / 0.1);
 	}
 	.rounded-lg {
 		border-radius: 0.5rem;
