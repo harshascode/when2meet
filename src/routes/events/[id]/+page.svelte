@@ -45,6 +45,7 @@
 	let isDragging = $state(false);
 	let startCell = $state<{ date: string; timeSlot: string } | null>(null);
 	let currentCell = $state<{ date: string; timeSlot: string } | null>(null);
+	let nameError = $state(false);
 
 	const timezones = Intl.supportedValuesOf('timeZone');
 
@@ -100,63 +101,102 @@
 		return new Date(dateStr).toLocaleString();
 	}
 
-	function startDrag(date: string, timeSlot: string) {
-		isDragging = true;
-		startCell = { date, timeSlot };
-		currentCell = { date, timeSlot };
-		toggleAvailability(date, timeSlot);
-	}
+	// function startDrag(date: string, timeSlot: string) {
+	// 	if (!participantName) {
+	// 		nameError = true;
+	// 		const nameInput = document.getElementById('participantName');
+	// 		nameInput?.focus();
+	// 		return;
+	// 	}
 
-	function handleDrag(date: string, timeSlot: string) {
-		if (isDragging && (currentCell?.date !== date || currentCell?.timeSlot !== timeSlot)) {
-			currentCell = { date, timeSlot };
-			toggleAvailability(date, timeSlot);
+	// 	isDragging = true;
+	// 	nameError = false;
+	// 	startCell = { date, timeSlot };
+	// 	currentCell = { date, timeSlot };
+	// 	toggleAvailability(date, timeSlot);
+	// 	window.addEventListener('mouseup', globalStopDrag);
+	// }
+
+	// function handleDrag(date: string, timeSlot: string) {
+	// 	if (!isDragging || !participantName) return;
+	// 	if (currentCell?.date === date && currentCell?.timeSlot === timeSlot) return;
+
+	// 	currentCell = { date, timeSlot };
+	// 	toggleAvailability(date, timeSlot);
+	// }
+
+	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
+		if (!isDragging) return;
+		const touch = e.touches[0];
+		if (!touch) return;
+		const target = document.elementFromPoint(touch.clientX, touch.clientY);
+		if (target?.closest('button')) {
+			handleDrag(date, timeSlot);
 		}
 	}
 
-	function stopDrag() {
-		isDragging = false;
-		startCell = null;
-		currentCell = null;
+	// function stopDrag() {
+	// 	if (isDragging) {
+	// 		isDragging = false;
+	// 		startCell = null;
+	// 		currentCell = null;
+	// 		window.removeEventListener('mouseup', globalStopDrag);
+	// 	}
+	// }
+
+	function globalStopDrag() {
+		stopDrag();
 	}
 
-	function toggleAvailability(date: string, timeSlot: string) {
-		if (!isDragging && startCell) return;
-		const dates = event?.dates || [];
-		const timeSlots = event?.timeSlots || [];
-		const startDateIndex = dates.indexOf(startCell?.date || date);
-		const endDateIndex = dates.indexOf(date);
-		const startTimeIndex = timeSlots.indexOf(startCell?.timeSlot || timeSlot);
-		const endTimeIndex = timeSlots.indexOf(timeSlot);
-		const minDateIndex = Math.min(startDateIndex, endDateIndex);
-		const maxDateIndex = Math.max(startDateIndex, endDateIndex);
-		const minTimeIndex = Math.min(startTimeIndex, endTimeIndex);
-		const maxTimeIndex = Math.max(startTimeIndex, endTimeIndex);
-		const currentState = availability[date]?.[timeSlot] || false;
+	// function toggleAvailability(date: string, timeSlot: string) {
+	// 	if (!isDragging || !startCell || !participantName) return;
 
-		for (let d = minDateIndex; d <= maxDateIndex; d++) {
-			for (let t = minTimeIndex; t <= maxTimeIndex; t++) {
-				const currentDate = dates[d];
-				const currentTime = timeSlots[t];
-				availability[currentDate][currentTime] = !currentState;
-			}
-		}
-		saveAvailability();
-	}
+	// 	const dates = event?.dates || [];
+	// 	const timeSlots = event?.timeSlots || [];
+	// 	const startDateIndex = dates.indexOf(startCell.date);
+	// 	const endDateIndex = dates.indexOf(date);
+	// 	const startTimeIndex = timeSlots.indexOf(startCell.timeSlot);
+	// 	const endTimeIndex = timeSlots.indexOf(timeSlot);
+
+	// 	const minDateIndex = Math.min(startDateIndex, endDateIndex);
+	// 	const maxDateIndex = Math.max(startDateIndex, endDateIndex);
+	// 	const minTimeIndex = Math.min(startTimeIndex, endTimeIndex);
+	// 	const maxTimeIndex = Math.max(startTimeIndex, endTimeIndex);
+
+	// 	const currentState = availability[startCell.date][startCell.timeSlot];
+	// 	const changes = [];
+
+	// 	for (let d = minDateIndex; d <= maxDateIndex; d++) {
+	// 		for (let t = minTimeIndex; t <= maxTimeIndex; t++) {
+	// 			const currentDate = dates[d];
+	// 			const currentTime = timeSlots[t];
+	// 			changes.push({ date: currentDate, time: currentTime, state: !currentState });
+	// 		}
+	// 	}
+
+	// 	changes.forEach(({ date, time, state }) => {
+	// 		availability[date][time] = state;
+	// 	});
+
+	// 	saveAvailability();
+	// }
 
 	async function saveAvailability() {
 		if (!participantName) {
-			alert('Please enter your name before selecting availability');
+			nameError = true;
 			return;
 		}
+
 		try {
 			const response = await fetch(`/api/events/${eventId}/responses`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ participantName, availability, timezone })
 			});
+
 			if (!response.ok) throw new Error('Failed to save availability');
 
+			// Show success message
 			const successMessage = document.createElement('div');
 			successMessage.className =
 				'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
@@ -164,6 +204,7 @@
 			document.body.appendChild(successMessage);
 			setTimeout(() => successMessage.remove(), 3000);
 
+			// Refresh data
 			const eventResponse = await fetch(`/api/events/${eventId}`);
 			if (eventResponse.ok) {
 				event = (await eventResponse.json()) as Event;
@@ -201,10 +242,17 @@
 
 	function getGroupAvailability(date: string, timeSlot: string): number {
 		if (!event?.responses) return 0;
+
+		// Get unique participants
+		const uniqueParticipants = new Set(event.responses.map((r) => r.participant_name));
+
+		// Count responses for this specific date and time slot
 		const responsesForSlot = event.responses.filter(
 			(r: Response) => r.date === date && r.time_slot === timeSlot
 		);
-		return (responsesForSlot.length / (event.responses.length || 1)) * 100;
+
+		// Calculate percentage based on unique participants
+		return (responsesForSlot.length / (uniqueParticipants.size || 1)) * 100;
 	}
 
 	function getParticipantAvailability(
@@ -217,6 +265,89 @@
 
 	function viewParticipantAvailability(participant: Participant): void {
 		selectedParticipant = participant;
+	}
+
+	// page added by me
+
+	// Add a temporary state for drag selection
+	let tempSelection = $state<{ [date: string]: { [timeSlot: string]: boolean } }>({});
+
+	// Modify startDrag function
+	function startDrag(date: string, timeSlot: string) {
+		if (!participantName) {
+			nameError = true;
+			const nameInput = document.getElementById('participantName');
+			nameInput?.focus();
+			return;
+		}
+
+		isDragging = true;
+		nameError = false;
+		startCell = { date, timeSlot };
+		currentCell = { date, timeSlot };
+
+		// Initialize tempSelection with the current state
+		tempSelection = JSON.parse(JSON.stringify(availability));
+		toggleAvailability(date, timeSlot, true); // Pass true to indicate drag start
+		window.addEventListener('mouseup', globalStopDrag);
+	}
+
+	// Modify handleDrag function
+	function handleDrag(date: string, timeSlot: string) {
+		if (!isDragging || !participantName) return;
+		if (currentCell?.date === date && currentCell?.timeSlot === timeSlot) return;
+
+		currentCell = { date, timeSlot };
+		toggleAvailability(date, timeSlot, false); // Pass false to indicate drag in progress
+	}
+
+	// Modify toggleAvailability function
+	function toggleAvailability(date: string, timeSlot: string, isStart: boolean) {
+		if (!isDragging || !startCell || !participantName) return;
+
+		const dates = event?.dates || [];
+		const timeSlots = event?.timeSlots || [];
+		const startDateIndex = dates.indexOf(startCell.date);
+		const endDateIndex = dates.indexOf(date);
+		const startTimeIndex = timeSlots.indexOf(startCell.timeSlot);
+		const endTimeIndex = timeSlots.indexOf(timeSlot);
+
+		const minDateIndex = Math.min(startDateIndex, endDateIndex);
+		const maxDateIndex = Math.max(startDateIndex, endDateIndex);
+		const minTimeIndex = Math.min(startTimeIndex, endTimeIndex);
+		const maxTimeIndex = Math.max(startTimeIndex, endTimeIndex);
+
+		const currentState = tempSelection[startCell.date][startCell.timeSlot];
+
+		// Update tempSelection
+		for (let d = minDateIndex; d <= maxDateIndex; d++) {
+			for (let t = minTimeIndex; t <= maxTimeIndex; t++) {
+				const currentDate = dates[d];
+				const currentTime = timeSlots[t];
+				tempSelection[currentDate][currentTime] = !currentState;
+			}
+		}
+
+		// If this is the start of the drag, update the UI immediately
+		if (isStart) {
+			availability = JSON.parse(JSON.stringify(tempSelection));
+		}
+	}
+
+	// Modify stopDrag function
+	function stopDrag() {
+		if (isDragging) {
+			isDragging = false;
+			startCell = null;
+			currentCell = null;
+
+			// Apply the final selection
+			availability = JSON.parse(JSON.stringify(tempSelection));
+			tempSelection = {};
+
+			saveAvailability();
+			window.removeEventListener('mouseup', globalStopDrag);
+		}
 	}
 </script>
 
@@ -257,13 +388,31 @@
 							<h2 class="mb-4 text-lg font-semibold text-gray-900">Your Information</h2>
 							<div class="space-y-4">
 								<div>
-									<label class="mb-1 block text-sm font-medium text-gray-700">Name</label>
+									<label for="participantName" class="mb-1 block text-sm font-medium text-gray-700">
+										Name
+										{#if nameError}
+											<span class="text-red-500">*</span>
+										{/if}
+									</label>
 									<input
 										type="text"
+										id="participantName"
 										bind:value={participantName}
-										class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+										class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors"
+										class:border-red-500={nameError}
+										class:border-gray-300={!nameError}
+										class:focus:ring-red-500={nameError}
+										class:focus:ring-blue-500={!nameError}
+										class:focus:border-red-500={nameError}
+										class:focus:border-blue-500={!nameError}
 										placeholder="Your name"
+										oninput={() => (nameError = false)}
 									/>
+									{#if nameError}
+										<p class="mt-1 text-sm text-red-600">
+											Please enter your name before selecting availability
+										</p>
+									{/if}
 								</div>
 								<div>
 									<label class="mb-1 block text-sm font-medium text-gray-700">Time Zone</label>
@@ -293,7 +442,7 @@
 										</div>
 										<button
 											class="rounded px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
-											on:click={() => viewParticipantAvailability(participant)}
+											onclick={() => viewParticipantAvailability(participant)}
 										>
 											View
 										</button>
@@ -349,12 +498,18 @@
 												{#each event?.dates || [] as date}
 													<button
 														type="button"
-														class="h-12 border-b border-r border-gray-200 transition-colors duration-75 hover:bg-opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+														class="h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
 														class:bg-green-500={availability[date]?.[timeSlot]}
 														class:bg-gray-100={!availability[date]?.[timeSlot]}
-														on:mousedown={() => startDrag(date, timeSlot)}
-														on:mouseover={() => handleDrag(date, timeSlot)}
-														on:mouseup={stopDrag}
+														class:cursor-pointer={participantName}
+														class:cursor-not-allowed={!participantName}
+														class:hover:bg-opacity-90={participantName}
+														onmousedown={() => startDrag(date, timeSlot)}
+														onmouseover={() => handleDrag(date, timeSlot)}
+														onmouseup={stopDrag}
+														ontouchstart={() => startDrag(date, timeSlot)}
+														ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
+														ontouchend={stopDrag}
 													>
 														<div class="pointer-events-none h-full w-full" />
 													</button>
@@ -366,7 +521,58 @@
 							</div>
 						</div>
 
-						<!-- Group Availability (Similar structure with color gradient) -->
+						<!-- Group Availability -->
+						<!-- Group Availability -->
+						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+							<div class="mb-6 flex items-center justify-between">
+								<h2 class="text-lg font-semibold text-gray-900">
+									Group Availability ({event?.responses?.length || 0})
+								</h2>
+								<div class="flex items-center gap-2">
+									<span class="text-xs text-gray-500">0%</span>
+									<div
+										class="h-3 w-24 rounded-full bg-gradient-to-r from-gray-100 to-green-500"
+									></div>
+									<span class="text-xs text-gray-500">100%</span>
+								</div>
+							</div>
+							<div class="overflow-x-auto pb-2">
+								<div class="inline-block min-w-full align-middle">
+									<div class="overflow-hidden rounded-lg border border-gray-200">
+										<div
+											class="grid bg-white"
+											style="grid-template-columns: 120px repeat({event?.dates?.length ||
+												0}, minmax(60px, 1fr))"
+										>
+											<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
+											{#each event?.dates || [] as date}
+												<div
+													class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
+												>
+													{formatDate(date)}
+												</div>
+											{/each}
+											{#each event?.timeSlots || [] as timeSlot}
+												<div
+													class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
+												>
+													{timeSlot}
+												</div>
+												{#each event?.dates || [] as date}
+													<div
+														class="h-12 border-b border-r border-gray-200"
+														style="background-color: rgba(34, 197, 94, {getGroupAvailability(
+															date,
+															timeSlot
+														) / 100})"
+													></div>
+												{/each}
+											{/each}
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -382,7 +588,7 @@
 						</h3>
 						<button
 							class="rounded-lg p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-							on:click={() => (selectedParticipant = null)}
+							onclick={() => (selectedParticipant = null)}
 						>
 							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path
@@ -394,7 +600,50 @@
 							</svg>
 						</button>
 					</div>
-					<!-- Modal Grid (Similar to main grid) -->
+
+					<div class="overflow-x-auto pb-2">
+						<div class="inline-block min-w-full align-middle">
+							<div class="overflow-hidden rounded-lg border border-gray-200">
+								<div
+									class="grid bg-white"
+									style="grid-template-columns: 120px repeat({event?.dates?.length ||
+										0}, minmax(60px, 1fr))"
+								>
+									<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
+									{#each event?.dates || [] as date}
+										<div
+											class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
+										>
+											{formatDate(date)}
+										</div>
+									{/each}
+
+									{#each event?.timeSlots || [] as timeSlot}
+										<div
+											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
+										>
+											{timeSlot}
+										</div>
+										{#each event?.dates || [] as date}
+											<div
+												class="h-12 border-b border-r border-gray-200 transition-colors"
+												class:bg-green-500={getParticipantAvailability(
+													selectedParticipant,
+													date,
+													timeSlot
+												)}
+												class:bg-gray-100={!getParticipantAvailability(
+													selectedParticipant,
+													date,
+													timeSlot
+												)}
+											></div>
+										{/each}
+									{/each}
+								</div>
+							</div>
+						</div>
+					</div>
 				</div>
 			</div>
 		{/if}
@@ -402,15 +651,3 @@
 
 	<Footer />
 </div>
-
-<style>
-	.selection-handle {
-		position: absolute;
-		width: 8px;
-		height: 8px;
-		background: #3b82f6;
-		bottom: -2px;
-		right: -2px;
-		cursor: crosshair;
-	}
-</style>
