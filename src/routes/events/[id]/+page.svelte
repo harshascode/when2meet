@@ -47,6 +47,11 @@
 	let mouseX = $state(0);
 	let mouseY = $state(0);
 
+	// Add a utility function to check if the device is mobile
+	function isMobileDevice() {
+		return /Mobi|Android/i.test(navigator.userAgent);
+	}
+
 	// Drag selection states
 	let dragSelection = $state<{
 		start: { date: string; timeSlot: string } | null;
@@ -166,11 +171,26 @@
 			return;
 		}
 
-		isDragging = true;
-		nameError = false;
-		dragSelection.start = { date, timeSlot };
-		dragSelection.end = { date, timeSlot };
-		window.addEventListener('mouseup', globalStopDrag);
+		if (!isMobileDevice()) {
+			isDragging = true;
+			dragSelection.start = { date, timeSlot };
+			dragSelection.end = { date, timeSlot };
+			window.addEventListener('mouseup', globalStopDrag);
+		}
+	}
+
+	function handleTouchStart(date: string, timeSlot: string) {
+		if (!participantName) {
+			nameError = true;
+			const nameInput = document.getElementById('participantName');
+			nameInput?.focus();
+			return;
+		}
+
+		// Toggle cell state on touch start
+		const currentState = availability[date][timeSlot];
+		availability[date][timeSlot] = !currentState;
+		saveAvailability();
 	}
 
 	function handleDrag(date: string, timeSlot: string) {
@@ -214,11 +234,9 @@
 		}
 	}
 
-	function globalStopDrag() {
-		stopDrag();
-	}
-
 	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
+		if (isMobileDevice()) return; // Disable drag on mobile devices
+
 		if (!isDragging) return;
 		const touch = e.touches[0];
 		if (!touch) return;
@@ -226,6 +244,16 @@
 		if (target?.closest('button')) {
 			handleDrag(date, timeSlot);
 		}
+	}
+
+	function handleCellClick(date: string, timeSlot: string) {
+		const currentState = availability[date][timeSlot];
+		availability[date][timeSlot] = !currentState;
+		saveAvailability();
+	}
+
+	function globalStopDrag() {
+		stopDrag();
 	}
 
 	function isInDragSelection(date: string, timeSlot: string): boolean {
@@ -497,7 +525,7 @@
 														onmouseout={handleCellLeave}
 														onmouseenter={() => handleDrag(date, timeSlot)}
 														onmouseup={stopDrag}
-														ontouchstart={() => startDrag(date, timeSlot)}
+														ontouchstart={() => handleTouchStart(date, timeSlot)}
 														ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
 														ontouchend={stopDrag}
 													>
