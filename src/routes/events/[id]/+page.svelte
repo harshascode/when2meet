@@ -163,6 +163,10 @@
 		return new Date(dateStr).toLocaleString();
 	}
 
+	let initialTouchX = 0;
+	let initialTouchY = 0;
+	const touchMoveThreshold = 10; // Adjust this threshold as needed
+
 	function startDrag(date: string, timeSlot: string) {
 		if (!participantName) {
 			nameError = true;
@@ -179,7 +183,7 @@
 		}
 	}
 
-	function handleTouchStart(date: string, timeSlot: string) {
+	function handleTouchStart(e: TouchEvent, date: string, timeSlot: string) {
 		if (!participantName) {
 			nameError = true;
 			const nameInput = document.getElementById('participantName');
@@ -187,10 +191,41 @@
 			return;
 		}
 
-		// Toggle cell state on touch start
-		const currentState = availability[date][timeSlot];
-		availability[date][timeSlot] = !currentState;
-		saveAvailability();
+		const touch = e.touches[0];
+		initialTouchX = touch.clientX;
+		initialTouchY = touch.clientY;
+	}
+
+	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
+		const touch = e.touches[0];
+		const deltaX = Math.abs(touch.clientX - initialTouchX);
+		const deltaY = Math.abs(touch.clientY - initialTouchY);
+
+		// If movement is beyond the threshold, consider it a scroll
+		if (deltaX > touchMoveThreshold || deltaY > touchMoveThreshold) {
+			return;
+		}
+
+		if (!isDragging) return;
+		const target = document.elementFromPoint(touch.clientX, touch.clientY);
+		if (target?.closest('button')) {
+			handleDrag(date, timeSlot);
+		}
+	}
+
+	function handleTouchEnd(e: TouchEvent, date: string, timeSlot: string) {
+		const touch = e.changedTouches[0];
+		const deltaX = Math.abs(touch.clientX - initialTouchX);
+		const deltaY = Math.abs(touch.clientY - initialTouchY);
+
+		// If movement was within the threshold, treat it as a tap/click
+		if (deltaX <= touchMoveThreshold && deltaY <= touchMoveThreshold) {
+			const currentState = availability[date][timeSlot];
+			availability[date][timeSlot] = !currentState;
+			saveAvailability();
+		}
+
+		stopDrag();
 	}
 
 	function handleDrag(date: string, timeSlot: string) {
@@ -231,18 +266,6 @@
 			dragSelection.start = null;
 			dragSelection.end = null;
 			window.removeEventListener('mouseup', globalStopDrag);
-		}
-	}
-
-	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
-		if (isMobileDevice()) return; // Disable drag on mobile devices
-
-		if (!isDragging) return;
-		const touch = e.touches[0];
-		if (!touch) return;
-		const target = document.elementFromPoint(touch.clientX, touch.clientY);
-		if (target?.closest('button')) {
-			handleDrag(date, timeSlot);
 		}
 	}
 
@@ -525,9 +548,9 @@
 														onmouseout={handleCellLeave}
 														onmouseenter={() => handleDrag(date, timeSlot)}
 														onmouseup={stopDrag}
-														ontouchstart={() => handleTouchStart(date, timeSlot)}
+														ontouchstart={(e) => handleTouchStart(e, date, timeSlot)}
 														ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
-														ontouchend={stopDrag}
+														ontouchend={(e) => handleTouchEnd(e, date, timeSlot)}
 													>
 														<div class="pointer-events-none h-full w-full">
 															{#if isInDragSelection(date, timeSlot)}
