@@ -75,8 +75,6 @@
 		dragSelection.end = { date, timeSlot };
 	}
 
-	
-
 	function stopDrag() {
 		if (isDragging) {
 			isDragging = false;
@@ -455,196 +453,205 @@
 				</div>
 
 				<!-- Grid Layout -->
-				<div class="grid gap-8 lg:grid-cols-[1fr_2fr]">
-					<!-- Left Sidebar -->
-					<div class="space-y-8">
-						<!-- User Info Section -->
-						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-							<h2 class="mb-4 text-lg font-semibold text-gray-900">Your Information</h2>
-							<div class="space-y-4">
-								<div>
-									<label for="participantName" class="mb-1 block text-sm font-medium text-gray-700">
-										Name {#if nameError}<span class="text-red-500">*</span>{/if}
-									</label>
-									<input
-										type="text"
-										id="participantName"
-										bind:value={participantName}
-										class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors"
-										class:border-red-500={nameError}
-										class:border-gray-300={!nameError}
-										class:focus:ring-red-500={nameError}
-										class:focus:ring-blue-500={!nameError}
-										class:focus:border-red-500={nameError}
-										class:focus:border-blue-500={!nameError}
-										placeholder="Your name"
-										oninput={() => (nameError = false)}
-									/>
-									{#if nameError}
-										<p class="mt-1 text-sm text-red-600">
-											Please enter your name before selecting availability
-										</p>
-									{/if}
-								</div>
-								<div>
-									<label class="mb-1 block text-sm font-medium text-gray-700">Time Zone</label>
-									<select
-										bind:value={timezone}
-										class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-									>
-										{#each timezones as tz}
-											<option value={tz}>{tz.replace(/_/g, ' ')}</option>
-										{/each}
-									</select>
-								</div>
-							</div>
-						</div>
-
-						<!-- Participants List -->
-						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-							<h2 class="mb-4 text-lg font-semibold text-gray-900">
-								Participants ({participants.length})
-							</h2>
-							<div class="divide-y divide-gray-200">
-								{#each participants as participant}
-									<div class="flex items-center justify-between py-3">
-										<div>
-											<p class="text-sm font-medium text-gray-900">{participant.name}</p>
-											<p class="mt-0.5 text-xs text-gray-500">{participant.timezone}</p>
-										</div>
-										<button
-											class="rounded px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
-											onclick={() => viewParticipantAvailability(participant)}
+				<div>
+					<div class="grid gap-8 lg:grid-cols-[1fr_2fr]">
+						<!-- Left Sidebar -->
+						<div class="space-y-8">
+							<!-- User Info Section -->
+							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+								<h2 class="mb-4 text-lg font-semibold text-gray-900">Your Information</h2>
+								<div class="space-y-4">
+									<div>
+										<label
+											for="participantName"
+											class="mb-1 block text-sm font-medium text-gray-700"
 										>
-											View
-										</button>
+											Name {#if nameError}<span class="text-red-500">*</span>{/if}
+										</label>
+										<input
+											type="text"
+											id="participantName"
+											bind:value={participantName}
+											class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors"
+											class:border-red-500={nameError}
+											class:border-gray-300={!nameError}
+											class:focus:ring-red-500={nameError}
+											class:focus:ring-blue-500={!nameError}
+											class:focus:border-red-500={nameError}
+											class:focus:border-blue-500={!nameError}
+											placeholder="Your name"
+											oninput={() => (nameError = false)}
+										/>
+										{#if nameError}
+											<p class="mt-1 text-sm text-red-600">
+												Please enter your name before selecting availability
+											</p>
+										{/if}
 									</div>
-								{/each}
-							</div>
-						</div>
-					</div>
-
-					<!-- Right Grid Section -->
-					<div class="space-y-8">
-						<!-- Individual Availability Grid -->
-						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-							<div class="mb-6 flex items-center justify-between">
-								<h2 class="text-lg font-semibold text-gray-900">Your Availability</h2>
-								<div class="flex gap-4">
-									<div class="flex items-center gap-2">
-										<div class="h-4 w-4 rounded-sm border border-gray-300 bg-gray-200"></div>
-										<span class="text-sm text-gray-600">No</span>
-									</div>
-									<div class="flex items-center gap-2">
-										<div class="h-4 w-4 rounded-sm border border-green-600 bg-green-500"></div>
-										<span class="text-sm text-gray-600">Yes</span>
-									</div>
-								</div>
-							</div>
-
-							<div class="overflow-x-auto pb-2">
-								<div class="inline-block min-w-full align-middle">
-									<div class="overflow-hidden rounded-lg border border-gray-200">
-										<div
-											class="grid bg-white"
-											style="grid-template-columns: 120px repeat({event?.dates?.length ||
-												0}, minmax(60px, 1fr))"
+									<div>
+										<label class="mb-1 block text-sm font-medium text-gray-700">Time Zone</label>
+										<select
+											bind:value={timezone}
+											class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
 										>
-											<!-- Column Headers -->
-											<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
-											{#each event?.dates || [] as date}
-												<div
-													class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
-												>
-													{formatDate(date)}
-												</div>
+											{#each timezones as tz}
+												<option value={tz}>{tz.replace(/_/g, ' ')}</option>
 											{/each}
-
-											<!-- Grid Cells -->
-											{#each event?.timeSlots || [] as timeSlot}
-												<div
-													class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
-												>
-													{timeSlot}
-												</div>
-												{#each event?.dates || [] as date}
-													<button
-														type="button"
-														class="relative h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
-														class:bg-green-500={availability[date]?.[timeSlot]}
-														class:bg-gray-100={!availability[date]?.[timeSlot]}
-														class:cursor-pointer={participantName}
-														class:cursor-not-allowed={!participantName}
-														class:hover:bg-opacity-90={participantName}
-														onmousedown={() => startDrag(date, timeSlot)}
-														onmouseover={() => handleCellHover(date, timeSlot)}
-														onmouseout={handleCellLeave}
-														onmouseenter={() => handleDrag(date, timeSlot)}
-														onmouseup={stopDrag}
-														ontouchstart={(e) => handleTouchStart(e, date, timeSlot)}
-														ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
-														ontouchend={(e) => handleTouchEnd(e, date, timeSlot)}
-													>
-														<div class="pointer-events-none h-full w-full">
-															{#if isInDragSelection(date, timeSlot)}
-																<div class="absolute inset-0 bg-blue-200 opacity-50"></div>
-															{/if}
-														</div>
-													</button>
-												{/each}
-											{/each}
-										</div>
+										</select>
 									</div>
 								</div>
 							</div>
-						</div>
 
-						<!-- Group Availability Grid -->
-						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-							<div class="mb-6 flex items-center justify-between">
-								<h2 class="text-lg font-semibold text-gray-900">
-									Group Availability ({event?.responses?.length || 0})
+							<!-- Participants List -->
+							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+								<h2 class="mb-4 text-lg font-semibold text-gray-900">
+									Participants ({participants.length})
 								</h2>
-								<div class="flex items-center gap-2">
-									<span class="text-xs text-gray-500">0%</span>
-									<div
-										class="h-3 w-24 rounded-full bg-gradient-to-r from-gray-100 to-green-500"
-									></div>
-									<span class="text-xs text-gray-500">100%</span>
+								<div class="divide-y divide-gray-200">
+									{#each participants as participant}
+										<div class="flex items-center justify-between py-3">
+											<div>
+												<p class="text-sm font-medium text-gray-900">{participant.name}</p>
+												<p class="mt-0.5 text-xs text-gray-500">{participant.timezone}</p>
+											</div>
+											<button
+												class="rounded px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+												onclick={() => viewParticipantAvailability(participant)}
+											>
+												View
+											</button>
+										</div>
+									{/each}
 								</div>
 							</div>
-							<div class="overflow-x-auto pb-2">
-								<div class="inline-block min-w-full align-middle">
-									<div class="overflow-hidden rounded-lg border border-gray-200">
-										<div
-											class="grid bg-white"
-											style="grid-template-columns: 120px repeat({event?.dates?.length ||
-												0}, minmax(60px, 1fr))"
-										>
-											<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
-											{#each event?.dates || [] as date}
+						</div>
+
+						<!-- Right Grid Section -->
+						<div class="space-y-8">
+							<!-- Individual Availability Grid -->
+							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+								<div class="mb-6 flex items-center justify-between">
+									<h2 class="text-lg font-semibold text-gray-900">Your Availability</h2>
+									<div class="flex gap-4">
+										<div class="flex items-center gap-2">
+											<div class="h-4 w-4 rounded-sm border border-gray-300 bg-gray-200"></div>
+											<span class="text-sm text-gray-600">No</span>
+										</div>
+										<div class="flex items-center gap-2">
+											<div class="h-4 w-4 rounded-sm border border-green-600 bg-green-500"></div>
+											<span class="text-sm text-gray-600">Yes</span>
+										</div>
+									</div>
+								</div>
+
+								<div class="overflow-x-auto pb-2">
+									<div class="inline-block min-w-full align-middle">
+										<div class="overflow-hidden rounded-lg border border-gray-200">
+											<div
+												class="grid bg-white"
+												style="grid-template-columns: 120px repeat({event?.dates?.length ||
+													0}, minmax(60px, 1fr))"
+											>
+												<!-- Column Headers -->
 												<div
-													class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
-												>
-													{formatDate(date)}
-												</div>
-											{/each}
-											{#each event?.timeSlots || [] as timeSlot}
-												<div
-													class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
-												>
-													{timeSlot}
-												</div>
+													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"
+												></div>
 												{#each event?.dates || [] as date}
 													<div
-														class="h-12 border-b border-r border-gray-200"
-														style="background-color: rgba(34, 197, 94, {getGroupAvailability(
-															date,
-															timeSlot
-														) / 100})"
-													></div>
+														class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
+													>
+														{formatDate(date)}
+													</div>
 												{/each}
-											{/each}
+
+												<!-- Grid Cells -->
+												{#each event?.timeSlots || [] as timeSlot}
+													<div
+														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
+													>
+														{timeSlot}
+													</div>
+													{#each event?.dates || [] as date}
+														<button
+															type="button"
+															class="relative h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
+															class:bg-green-500={availability[date]?.[timeSlot]}
+															class:bg-gray-100={!availability[date]?.[timeSlot]}
+															class:cursor-pointer={participantName}
+															class:cursor-not-allowed={!participantName}
+															class:hover:bg-opacity-90={participantName}
+															onmousedown={() => startDrag(date, timeSlot)}
+															onmouseover={() => handleCellHover(date, timeSlot)}
+															onmouseout={handleCellLeave}
+															onmouseenter={() => handleDrag(date, timeSlot)}
+															onmouseup={stopDrag}
+															ontouchstart={(e) => handleTouchStart(e, date, timeSlot)}
+															ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
+															ontouchend={(e) => handleTouchEnd(e, date, timeSlot)}
+														>
+															<div class="pointer-events-none h-full w-full">
+																{#if isInDragSelection(date, timeSlot)}
+																	<div class="absolute inset-0 bg-blue-200 opacity-50"></div>
+																{/if}
+															</div>
+														</button>
+													{/each}
+												{/each}
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Group Availability Grid -->
+							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+								<div class="mb-6 flex items-center justify-between">
+									<h2 class="text-lg font-semibold text-gray-900">
+										Group Availability ({event?.responses?.length || 0})
+									</h2>
+									<div class="flex items-center gap-2">
+										<span class="text-xs text-gray-500">0%</span>
+										<div
+											class="h-3 w-24 rounded-full bg-gradient-to-r from-gray-100 to-green-500"
+										></div>
+										<span class="text-xs text-gray-500">100%</span>
+									</div>
+								</div>
+								<div class="overflow-x-auto pb-2">
+									<div class="inline-block min-w-full align-middle">
+										<div class="overflow-hidden rounded-lg border border-gray-200">
+											<div
+												class="grid bg-white"
+												style="grid-template-columns: 120px repeat({event?.dates?.length ||
+													0}, minmax(60px, 1fr))"
+											>
+												<div
+													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"
+												></div>
+												{#each event?.dates || [] as date}
+													<div
+														class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
+													>
+														{formatDate(date)}
+													</div>
+												{/each}
+												{#each event?.timeSlots || [] as timeSlot}
+													<div
+														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
+													>
+														{timeSlot}
+													</div>
+													{#each event?.dates || [] as date}
+														<div
+															class="h-12 border-b border-r border-gray-200"
+															style="background-color: rgba(34, 197, 94, {getGroupAvailability(
+																date,
+																timeSlot
+															) / 100})"
+														></div>
+													{/each}
+												{/each}
+											</div>
 										</div>
 									</div>
 								</div>
