@@ -1,4 +1,5 @@
 <script lang="ts">
+	// ========== Type Definitions ==========
 	interface Availability {
 		[date: string]: {
 			[timeSlot: string]: boolean;
@@ -27,145 +28,66 @@
 		responses: Response[];
 	}
 
+	// ========== Imports ==========
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import Header from '$lib/Header.svelte';
-	import Footer from '$lib/Footer.svelte';
 	import { format } from 'date-fns';
 
+	// ========== State Management ==========
 	const eventId = page.params.id;
+
 	let event: Event | null = $state(null);
 	let loading = $state(true);
 	let error: string | null = $state(null);
+
 	let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
 	let participantName = $state('');
 	let availability: Availability = $state({});
+
 	let participants: Participant[] = $state([]);
 	let selectedParticipant: Participant | null = $state(null);
+
 	let isDragging = $state(false);
 	let nameError = $state(false);
 	let mouseX = $state(0);
 	let mouseY = $state(0);
 
-	// Add a utility function to check if the device is mobile
-	function isMobileDevice() {
-		return /Mobi|Android/i.test(navigator.userAgent);
-	}
-
-	// Drag selection states
 	let dragSelection = $state<{
 		start: { date: string; timeSlot: string } | null;
 		end: { date: string; timeSlot: string } | null;
 	}>({ start: null, end: null });
 
-	// Hover states
 	let hoveredCell = $state<{ date: string; timeSlot: string } | null>(null);
-	let hoverTimeout: any | null = $state(null);
+	let hoverTimeout: ReturnType<typeof setTimeout> | null = $state(null);
 
+	// ========== Constants ==========
 	const timezones = Intl.supportedValuesOf('timeZone');
 
-	function trackMousePosition(event: MouseEvent) {
-		mouseX = event.clientX;
-		mouseY = event.clientY;
+	// ========== Event Handlers ==========
+	function handleCellClick(date: string, timeSlot: string) {
+		const currentState = availability[date][timeSlot];
+		availability[date][timeSlot] = !currentState;
+		saveAvailability();
 	}
 
-	function getParticipantsForSlot(
-		date: string,
-		timeSlot: string
-	): { available: string[]; unavailable: string[] } {
-		if (!event?.responses) return { available: [], unavailable: [] };
-
-		const available = new Set<string>();
-		const allParticipants = new Set<string>();
-
-		event.responses.forEach((response) => {
-			allParticipants.add(response.participant_name);
-			if (response.date === date && response.time_slot === timeSlot) {
-				available.add(response.participant_name);
-			}
-		});
-
-		const unavailable = Array.from(allParticipants).filter(
-			(participant) => !available.has(participant)
-		);
-
-		return {
-			available: Array.from(available),
-			unavailable: unavailable
-		};
+	function handleDrag(date: string, timeSlot: string) {
+		if (!isDragging || !participantName) return;
+		dragSelection.end = { date, timeSlot };
 	}
 
-	function handleCellHover(date: string, timeSlot: string) {
-		if (hoverTimeout) {
-			clearTimeout(hoverTimeout);
+	
+
+	function stopDrag() {
+		if (isDragging) {
+			isDragging = false;
+			updateDragSelection();
+			window.removeEventListener('mouseup', globalStopDrag);
 		}
-		hoverTimeout = setTimeout(() => {
-			hoveredCell = { date, timeSlot };
-		}, 200);
 	}
 
-	function handleCellLeave() {
-		if (hoverTimeout) {
-			clearTimeout(hoverTimeout);
-		}
-		hoveredCell = null;
+	function globalStopDrag() {
+		stopDrag();
 	}
-
-	onMount(async () => {
-		try {
-			const response = await fetch(`/api/events/${eventId}`);
-			if (!response.ok) throw new Error('Event not found');
-			event = (await response.json()) as Event;
-
-			event.dates.forEach((date: string) => {
-				availability[date] = {};
-				event!.timeSlots.forEach((timeSlot: string) => {
-					availability[date][timeSlot] = false;
-				});
-			});
-
-			if (event.responses) {
-				const participantMap = new Map<string, Participant>();
-				event.responses.forEach((response: Response) => {
-					if (!participantMap.has(response.participant_name)) {
-						participantMap.set(response.participant_name, {
-							name: response.participant_name,
-							timezone: response.timezone,
-							availability: {},
-							lastUpdated: response.created_at
-						});
-					}
-					const participant = participantMap.get(response.participant_name);
-					if (participant) {
-						if (!participant.availability[response.date]) {
-							participant.availability[response.date] = {};
-						}
-						participant.availability[response.date][response.time_slot] = true;
-					}
-				});
-				participants = Array.from(participantMap.values()).sort(
-					(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
-				);
-			}
-		} catch (e) {
-			error = (e as Error).message;
-		} finally {
-			loading = false;
-		}
-	});
-
-	function formatDate(dateStr: string) {
-		const date = new Date(dateStr);
-		return format(date, 'MMM d\nEEE');
-	}
-
-	function formatDateTime(dateStr: string) {
-		return new Date(dateStr).toLocaleString();
-	}
-
-	let initialTouchX = 0;
-	let initialTouchY = 0;
-	const touchMoveThreshold = 10; // Adjust this threshold as needed
 
 	function startDrag(date: string, timeSlot: string) {
 		if (!participantName) {
@@ -201,12 +123,9 @@
 		const deltaX = Math.abs(touch.clientX - initialTouchX);
 		const deltaY = Math.abs(touch.clientY - initialTouchY);
 
-		// If movement is beyond the threshold, consider it a scroll
-		if (deltaX > touchMoveThreshold || deltaY > touchMoveThreshold) {
-			return;
-		}
-
+		if (deltaX > touchMoveThreshold || deltaY > touchMoveThreshold) return;
 		if (!isDragging) return;
+
 		const target = document.elementFromPoint(touch.clientX, touch.clientY);
 		if (target?.closest('button')) {
 			handleDrag(date, timeSlot);
@@ -218,80 +137,138 @@
 		const deltaX = Math.abs(touch.clientX - initialTouchX);
 		const deltaY = Math.abs(touch.clientY - initialTouchY);
 
-		// If movement was within the threshold, treat it as a tap/click
 		if (deltaX <= touchMoveThreshold && deltaY <= touchMoveThreshold) {
 			const currentState = availability[date][timeSlot];
 			availability[date][timeSlot] = !currentState;
 			saveAvailability();
 		}
-
 		stopDrag();
 	}
 
-	function handleDrag(date: string, timeSlot: string) {
-		if (!isDragging || !participantName) return;
-		dragSelection.end = { date, timeSlot };
+	function viewParticipantAvailability(participant: Participant): void {
+		selectedParticipant = participant;
 	}
 
-	function stopDrag() {
-		if (isDragging) {
-			isDragging = false;
-
-			if (dragSelection.start && dragSelection.end) {
-				const dates = event?.dates || [];
-				const timeSlots = event?.timeSlots || [];
-				const startDateIdx = dates.indexOf(dragSelection.start.date);
-				const endDateIdx = dates.indexOf(dragSelection.end.date);
-				const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
-				const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
-
-				const minDateIdx = Math.min(startDateIdx, endDateIdx);
-				const maxDateIdx = Math.max(startDateIdx, endDateIdx);
-				const minTimeIdx = Math.min(startTimeIdx, endTimeIdx);
-				const maxTimeIdx = Math.max(startTimeIdx, endTimeIdx);
-
-				const currentState = availability[dragSelection.start.date][dragSelection.start.timeSlot];
-
-				for (let d = minDateIdx; d <= maxDateIdx; d++) {
-					for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
-						const date = dates[d];
-						const timeSlot = timeSlots[t];
-						availability[date][timeSlot] = !currentState;
-					}
-				}
-
-				saveAvailability();
-			}
-
-			dragSelection.start = null;
-			dragSelection.end = null;
-			window.removeEventListener('mouseup', globalStopDrag);
-		}
+	// ========== Utility Functions ==========
+	function trackMousePosition(event: MouseEvent) {
+		mouseX = event.clientX;
+		mouseY = event.clientY;
 	}
 
-	function handleCellClick(date: string, timeSlot: string) {
-		const currentState = availability[date][timeSlot];
-		availability[date][timeSlot] = !currentState;
-		saveAvailability();
+	function isMobileDevice(): boolean {
+		return /Mobi|Android/i.test(navigator.userAgent);
 	}
 
-	function globalStopDrag() {
-		stopDrag();
+	function formatDate(dateStr: string): string {
+		return format(new Date(dateStr), 'MMM d\nEEE');
 	}
 
-	function isInDragSelection(date: string, timeSlot: string): boolean {
-		if (!dragSelection.start || !dragSelection.end) return false;
+	function formatDateTime(dateStr: string): string {
+		return new Date(dateStr).toLocaleString();
+	}
 
-		const dates = event?.dates || [];
-		const timeSlots = event?.timeSlots || [];
+	function handleCellHover(date: string, timeSlot: string) {
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoverTimeout = setTimeout(() => (hoveredCell = { date, timeSlot }), 200);
+	}
 
+	function handleCellLeave() {
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoveredCell = null;
+	}
+
+	// ========== Business Logic ==========
+	function updateDragSelection() {
+		if (!dragSelection.start || !dragSelection.end || !event) return;
+
+		const dates = event.dates;
+		const timeSlots = event.timeSlots;
 		const startDateIdx = dates.indexOf(dragSelection.start.date);
 		const endDateIdx = dates.indexOf(dragSelection.end.date);
 		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
 		const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
 
+		const [minDateIdx, maxDateIdx] = [
+			Math.min(startDateIdx, endDateIdx),
+			Math.max(startDateIdx, endDateIdx)
+		];
+		const [minTimeIdx, maxTimeIdx] = [
+			Math.min(startTimeIdx, endTimeIdx),
+			Math.max(startTimeIdx, endTimeIdx)
+		];
+
+		const currentState = availability[dragSelection.start.date][dragSelection.start.timeSlot];
+
+		for (let d = minDateIdx; d <= maxDateIdx; d++) {
+			for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
+				const date = dates[d];
+				const timeSlot = timeSlots[t];
+				availability[date][timeSlot] = !currentState;
+			}
+		}
+
+		saveAvailability();
+		dragSelection.start = null;
+		dragSelection.end = null;
+	}
+
+	function getGroupAvailability(date: string, timeSlot: string): number {
+		if (!event?.responses) return 0;
+
+		const uniqueParticipants = new Set(event.responses.map((r) => r.participant_name));
+		const responsesForSlot = event.responses.filter(
+			(r) => r.date === date && r.time_slot === timeSlot
+		);
+
+		return (responsesForSlot.length / (uniqueParticipants.size || 1)) * 100;
+	}
+
+	function getParticipantsForSlot(
+		date: string,
+		timeSlot: string
+	): { available: string[]; unavailable: string[] } {
+		if (!event?.responses) return { available: [], unavailable: [] };
+
+		const available = new Set<string>();
+		const allParticipants = new Set<string>();
+
+		event.responses.forEach((response) => {
+			allParticipants.add(response.participant_name);
+			if (response.date === date && response.time_slot === timeSlot) {
+				available.add(response.participant_name);
+			}
+		});
+
+		const unavailable = Array.from(allParticipants).filter(
+			(participant) => !available.has(participant)
+		);
+
+		return {
+			available: Array.from(available),
+			unavailable
+		};
+	}
+
+	function getParticipantAvailability(
+		participant: Participant | null,
+		date: string,
+		timeSlot: string
+	): boolean {
+		return participant?.availability?.[date]?.[timeSlot] || false;
+	}
+
+	function isInDragSelection(date: string, timeSlot: string): boolean {
+		if (!dragSelection.start || !dragSelection.end || !event) return false;
+
+		const dates = event.dates;
+		const timeSlots = event.timeSlots;
 		const currentDateIdx = dates.indexOf(date);
 		const currentTimeIdx = timeSlots.indexOf(timeSlot);
+
+		const startDateIdx = dates.indexOf(dragSelection.start.date);
+		const endDateIdx = dates.indexOf(dragSelection.end.date);
+		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
+		const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
 
 		return (
 			currentDateIdx >= Math.min(startDateIdx, endDateIdx) &&
@@ -301,6 +278,7 @@
 		);
 	}
 
+	// ========== API Interactions ==========
 	async function saveAvailability() {
 		if (!participantName) {
 			nameError = true;
@@ -315,73 +293,111 @@
 			});
 
 			if (!response.ok) throw new Error('Failed to save availability');
+			showSuccessFeedback();
+			await refreshEventData();
+		} catch (error: unknown) {
+			handleSaveError(error);
+		}
+	}
 
-			// Show success message
-			const successMessage = document.createElement('div');
-			successMessage.className =
-				'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
-			successMessage.textContent = 'Availability saved successfully!';
-			document.body.appendChild(successMessage);
-			setTimeout(() => successMessage.remove(), 3000);
+	// ========== UI Helpers ==========
+	function showSuccessFeedback() {
+		const successMessage = document.createElement('div');
+		successMessage.className =
+			'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
+		successMessage.textContent = 'Availability saved successfully!';
+		document.body.appendChild(successMessage);
+		setTimeout(() => successMessage.remove(), 3000);
+	}
 
-			// Refresh data
-			const eventResponse = await fetch(`/api/events/${eventId}`);
-			if (eventResponse.ok) {
-				event = (await eventResponse.json()) as Event;
-				updateParticipants();
-			}
-		} catch (error: any) {
-			alert(error.message || 'Failed to save your availability. Please try again.');
+	// ========== Data Management ==========
+	async function refreshEventData() {
+		const eventResponse = await fetch(`/api/events/${eventId}`);
+		if (eventResponse.ok) {
+			event = (await eventResponse.json()) as Event;
+			updateParticipants();
 		}
 	}
 
 	function updateParticipants() {
 		if (!event?.responses) return;
+
 		const participantMap = new Map<string, Participant>();
-		event.responses.forEach((response: Response) => {
-			if (!participantMap.has(response.participant_name)) {
-				participantMap.set(response.participant_name, {
-					name: response.participant_name,
-					timezone: response.timezone,
-					availability: {},
-					lastUpdated: response.created_at
-				});
-			}
-			const participant = participantMap.get(response.participant_name);
-			if (participant) {
-				if (!participant.availability[response.date]) {
-					participant.availability[response.date] = {};
-				}
-				participant.availability[response.date][response.time_slot] = true;
-			}
+		event.responses.forEach((response) => {
+			const participant = participantMap.get(response.participant_name) ?? {
+				name: response.participant_name,
+				timezone: response.timezone,
+				availability: {},
+				lastUpdated: response.created_at
+			};
+
+			participant.availability[response.date] = participant.availability[response.date] ?? {};
+			participant.availability[response.date][response.time_slot] = true;
+			participantMap.set(response.participant_name, participant);
 		});
+
 		participants = Array.from(participantMap.values()).sort(
 			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
 		);
 	}
 
-	function getGroupAvailability(date: string, timeSlot: string): number {
-		if (!event?.responses) return 0;
+	// ========== Error Handling ==========
+	function handleSaveError(error: unknown) {
+		const message = error instanceof Error ? error.message : 'Failed to save your availability';
+		alert(message);
+	}
 
-		const uniqueParticipants = new Set(event.responses.map((r) => r.participant_name));
-		const responsesForSlot = event.responses.filter(
-			(r: Response) => r.date === date && r.time_slot === timeSlot
+	// ========== Lifecycle Hooks ==========
+	onMount(async () => {
+		try {
+			const response = await fetch(`/api/events/${eventId}`);
+			if (!response.ok) throw new Error('Event not found');
+
+			event = (await response.json()) as Event;
+			initializeAvailability();
+			initializeParticipants();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load event';
+		} finally {
+			loading = false;
+		}
+	});
+
+	function initializeAvailability() {
+		event?.dates.forEach((date) => {
+			availability[date] = {};
+			event?.timeSlots.forEach((timeSlot) => {
+				availability[date][timeSlot] = false;
+			});
+		});
+	}
+
+	function initializeParticipants() {
+		if (!event?.responses) return;
+
+		const participantMap = new Map<string, Participant>();
+		event.responses.forEach((response) => {
+			const participant = participantMap.get(response.participant_name) ?? {
+				name: response.participant_name,
+				timezone: response.timezone,
+				availability: {},
+				lastUpdated: response.created_at
+			};
+
+			participant.availability[response.date] = participant.availability[response.date] ?? {};
+			participant.availability[response.date][response.time_slot] = true;
+			participantMap.set(response.participant_name, participant);
+		});
+
+		participants = Array.from(participantMap.values()).sort(
+			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
 		);
-
-		return (responsesForSlot.length / (uniqueParticipants.size || 1)) * 100;
 	}
 
-	function getParticipantAvailability(
-		participant: Participant | null,
-		date: string,
-		timeSlot: string
-	): boolean {
-		return participant?.availability?.[date]?.[timeSlot] || false;
-	}
-
-	function viewParticipantAvailability(participant: Participant): void {
-		selectedParticipant = participant;
-	}
+	// ========== Drag Constants ==========
+	let initialTouchX = 0;
+	let initialTouchY = 0;
+	const touchMoveThreshold = 10;
 </script>
 
 <div
@@ -389,6 +405,7 @@
 	onmousemove={trackMousePosition}
 	role="presentation"
 >
+	<!-- Header Section -->
 	<header class="border-b">
 		<div class="container flex h-14 items-center px-4">
 			<div class="flex gap-6 md:gap-10">
@@ -407,8 +424,10 @@
 		</div>
 	</header>
 
+	<!-- Main Content -->
 	<main class="container mx-auto max-w-7xl flex-1 px-4 py-8">
 		{#if loading}
+			<!-- Loading State -->
 			<div class="py-12 text-center">
 				<div
 					class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"
@@ -416,8 +435,10 @@
 				<p class="mt-4 text-sm text-gray-600">Loading event details...</p>
 			</div>
 		{:else if error}
+			<!-- Error State -->
 			<div class="rounded-lg bg-red-50 p-4 text-center text-sm text-red-600">{error}</div>
 		{:else}
+			<!-- Event Content -->
 			<div class="space-y-8">
 				<!-- Event Header -->
 				<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
@@ -433,19 +454,17 @@
 					</div>
 				</div>
 
-				<div class="">
+				<!-- Grid Layout -->
+				<div class="grid gap-8 lg:grid-cols-[1fr_2fr]">
 					<!-- Left Sidebar -->
-					<div class="space-y-8 lg:col-span-1">
-						<!-- User Info -->
+					<div class="space-y-8">
+						<!-- User Info Section -->
 						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 							<h2 class="mb-4 text-lg font-semibold text-gray-900">Your Information</h2>
 							<div class="space-y-4">
 								<div>
 									<label for="participantName" class="mb-1 block text-sm font-medium text-gray-700">
-										Name
-										{#if nameError}
-											<span class="text-red-500">*</span>
-										{/if}
+										Name {#if nameError}<span class="text-red-500">*</span>{/if}
 									</label>
 									<input
 										type="text"
@@ -468,7 +487,6 @@
 									{/if}
 								</div>
 								<div>
-									<!-- svelte-ignore a11y_label_has_associated_control -->
 									<label class="mb-1 block text-sm font-medium text-gray-700">Time Zone</label>
 									<select
 										bind:value={timezone}
@@ -482,7 +500,7 @@
 							</div>
 						</div>
 
-						<!-- Participants -->
+						<!-- Participants List -->
 						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 							<h2 class="mb-4 text-lg font-semibold text-gray-900">
 								Participants ({participants.length})
@@ -506,9 +524,9 @@
 						</div>
 					</div>
 
-					<!-- Grids -->
-					<div class="space-y-8 lg:col-span-2">
-						<!-- Individual Availability -->
+					<!-- Right Grid Section -->
+					<div class="space-y-8">
+						<!-- Individual Availability Grid -->
 						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 							<div class="mb-6 flex items-center justify-between">
 								<h2 class="text-lg font-semibold text-gray-900">Your Availability</h2>
@@ -550,7 +568,6 @@
 													{timeSlot}
 												</div>
 												{#each event?.dates || [] as date}
-													<!-- svelte-ignore a11y_mouse_events_have_key_events -->
 													<button
 														type="button"
 														class="relative h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
@@ -582,7 +599,7 @@
 							</div>
 						</div>
 
-						<!-- Group Availability -->
+						<!-- Group Availability Grid -->
 						<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 							<div class="mb-6 flex items-center justify-between">
 								<h2 class="text-lg font-semibold text-gray-900">
@@ -648,7 +665,6 @@
 				<h4 class="mb-3 text-sm font-semibold text-gray-900">
 					{formatDate(hoveredCell.date)} at {hoveredCell.timeSlot}
 				</h4>
-
 				<div class="space-y-3">
 					<div>
 						<h5 class="mb-1 text-xs font-medium text-green-600">
@@ -667,7 +683,6 @@
 							<p class="text-sm text-gray-500">No participants available</p>
 						{/if}
 					</div>
-
 					<div>
 						<h5 class="mb-1 text-xs font-medium text-red-600">
 							Unavailable ({participants.unavailable.length})
@@ -712,7 +727,6 @@
 							</svg>
 						</button>
 					</div>
-
 					<div class="overflow-x-auto pb-2">
 						<div class="inline-block min-w-full align-middle">
 							<div class="overflow-hidden rounded-lg border border-gray-200">
@@ -729,7 +743,6 @@
 											{formatDate(date)}
 										</div>
 									{/each}
-
 									{#each event?.timeSlots || [] as timeSlot}
 										<div
 											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
@@ -761,11 +774,13 @@
 		{/if}
 	</main>
 
+	<!-- Footer Section -->
 	<footer class="border-t py-4 text-center text-sm text-gray-500">
 		<p>When2meet is a free service. We do not ask for contact or billing information.</p>
 	</footer>
 </div>
 
+<!-- Styles -->
 <style>
 	.relative {
 		position: relative;
