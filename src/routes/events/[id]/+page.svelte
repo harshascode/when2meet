@@ -423,7 +423,7 @@
 	</header>
 
 	<!-- Main Content -->
-	<main class="container mx-auto max-w-7xl flex-1 px-4 py-8">
+	<main class="container mx-auto max-w-7xl flex-1 px-4 py-6">
 		{#if loading}
 			<!-- Loading State -->
 			<div class="py-12 text-center">
@@ -439,7 +439,7 @@
 			<!-- Event Content -->
 			<div class="space-y-8">
 				<!-- Event Header -->
-				<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 					<h1 class="text-2xl font-semibold text-gray-900">{event?.name}</h1>
 					<div class="mt-3 flex items-center gap-2 text-sm">
 						<span class="text-gray-500">Share link:</span>
@@ -454,11 +454,11 @@
 
 				<!-- Grid Layout -->
 				<div>
-					<div class="grid gap-8 lg:grid-cols-[1fr_2fr]">
+					<div class="flex flex-col gap-8 lg:flex-row">
 						<!-- Left Sidebar -->
-						<div class="space-y-8">
+						<div class="min-w-60 space-y-8">
 							<!-- User Info Section -->
-							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<h2 class="mb-4 text-lg font-semibold text-gray-900">Your Information</h2>
 								<div class="space-y-4">
 									<div>
@@ -503,7 +503,7 @@
 							</div>
 
 							<!-- Participants List -->
-							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<h2 class="mb-4 text-lg font-semibold text-gray-900">
 									Participants ({participants.length})
 								</h2>
@@ -527,9 +527,9 @@
 						</div>
 
 						<!-- Right Grid Section -->
-						<div class="space-y-8">
+						<div class="max-w-4xl gap-6 space-y-8 w-full">
 							<!-- Individual Availability Grid -->
-							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<div class="mb-6 flex items-center justify-between">
 									<h2 class="text-lg font-semibold text-gray-900">Your Availability</h2>
 									<div class="flex gap-4">
@@ -549,7 +549,7 @@
 										<div class="overflow-hidden rounded-lg border border-gray-200">
 											<div
 												class="grid bg-white"
-												style="grid-template-columns: 120px repeat({event?.dates?.length ||
+												style="grid-template-columns: 60px repeat({event?.dates?.length ||
 													0}, minmax(60px, 1fr))"
 											>
 												<!-- Column Headers -->
@@ -558,7 +558,7 @@
 												></div>
 												{#each event?.dates || [] as date}
 													<div
-														class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
+														class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-xs font-medium text-gray-700"
 													>
 														{formatDate(date)}
 													</div>
@@ -567,14 +567,15 @@
 												<!-- Grid Cells -->
 												{#each event?.timeSlots || [] as timeSlot}
 													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
+														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
 													>
 														{timeSlot}
 													</div>
 													{#each event?.dates || [] as date}
+														<!-- svelte-ignore a11y_mouse_events_have_key_events -->
 														<button
 															type="button"
-															class="relative h-12 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
+															class="relative h-10 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
 															class:bg-green-500={availability[date]?.[timeSlot]}
 															class:bg-gray-100={!availability[date]?.[timeSlot]}
 															class:cursor-pointer={participantName}
@@ -622,7 +623,7 @@
 										<div class="overflow-hidden rounded-lg border border-gray-200">
 											<div
 												class="grid bg-white"
-												style="grid-template-columns: 120px repeat({event?.dates?.length ||
+												style="grid-template-columns: 60px repeat({event?.dates?.length ||
 													0}, minmax(60px, 1fr))"
 											>
 												<div
@@ -643,7 +644,7 @@
 													</div>
 													{#each event?.dates || [] as date}
 														<div
-															class="h-12 border-b border-r border-gray-200"
+															class="h-10 border-b border-r border-gray-200"
 															style="background-color: rgba(34, 197, 94, {getGroupAvailability(
 																date,
 																timeSlot
@@ -758,7 +759,7 @@
 										</div>
 										{#each event?.dates || [] as date}
 											<div
-												class="h-12 border-b border-r border-gray-200 transition-colors"
+												class="h-10 border-b border-r border-gray-200 transition-colors"
 												class:bg-green-500={getParticipantAvailability(
 													selectedParticipant,
 													date,
