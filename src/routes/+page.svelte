@@ -185,22 +185,22 @@
 <div class="min-h-screen bg-gradient-to-br from-gray-50 to-white">
 	<Header />
 
-	<main class="container mx-auto max-w-6xl px-4 py-8">
-		<div class="mx-auto mb-10 max-w-2xl">
+	<main class="container mx-auto max-w-6xl px-4 py-5">
+		<div class="mx-auto mb-6 max-w-2xl">
 			<input
 				type="text"
 				placeholder="Enter event name"
 				class="w-full rounded-lg border border-gray-300 bg-white px-6 py-4
-					text-center text-2xl font-medium text-gray-900 placeholder-gray-400
-					transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+					text-center font-medium text-gray-900 placeholder-gray-400
+					transition-all"
 				bind:value={eventName}
 			/>
 		</div>
 
-		<div class="grid gap-6 lg:grid-cols-2">
+		<div class="flex flex-col justify-center justify-items-center gap-6 md:flex-row">
 			<!-- Calendar Card -->
-			<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-xs">
-				<div class="mb-6 flex items-center justify-between">
+			<div class="shadow-xs h-fit rounded-lg border border-gray-200 bg-white p-4 md:w-80">
+				<div class="mb-3 flex items-center justify-between">
 					<button
 						class="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
 						aria-label="Previous Month"
@@ -249,10 +249,10 @@
 						<button
 							class="aspect-square rounded-md text-sm font-medium
                                 {!day.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
-                                {day.isToday ? 'ring-2 ring-blue-500' : ''}
+                                {day.isToday ? 'ring-1 ring-blue-500' : ''}
                                 {selectedDatesSet.has(day.date.getTime())
-									? 'bg-blue-600 text-white hover:bg-blue-700'
-									: 'hover:bg-blue-50'}"
+								? 'bg-blue-600 text-white hover:bg-blue-700'
+								: 'hover:bg-blue-50'}"
 							onclick={() => toggleDateSelection(day.date)}
 						>
 							{day.dayLabel}
@@ -260,7 +260,7 @@
 					{/each}
 				</div>
 
-				{#if selectedDates.length > 0}
+				<!-- {#if selectedDates.length > 0}
 					<div class="mt-4 flex flex-wrap gap-2">
 						{#each sortedSelectedDates as date}
 							<span class="rounded-md bg-blue-100 px-2.5 py-1 text-sm text-blue-700">
@@ -268,11 +268,11 @@
 							</span>
 						{/each}
 					</div>
-				{/if}
+				{/if} -->
 			</div>
 
 			<!-- Time Selection Card -->
-			<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-xs">
+			<div class="shadow-xs w-96 rounded-lg border border-gray-200 bg-white p-6">
 				<div class="mb-6 grid grid-cols-2 gap-4">
 					<div>
 						<label for="startTime" class="mb-2 block text-sm font-medium text-gray-700"
@@ -325,10 +325,10 @@
 				<div class="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
 					{#each timeSlots as timeSlot (timeSlot.time)}
 						<button
-							class="rounded-md px-3 py-2 text-sm font-medium transition-colors
+							class="rounded-sm px-3 py-2 text-xs font-medium transition-colors
                                 {selectedTimesSet.has(timeSlot.time)
-									? 'bg-blue-600 text-white hover:bg-blue-700'
-									: 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
+								? 'bg-blue-600 text-white hover:bg-blue-700'
+								: 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
 							onclick={() => toggleTimeSelection(timeSlot.time)}
 						>
 							{timeSlot.formatted}
