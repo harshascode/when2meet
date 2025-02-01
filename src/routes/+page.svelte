@@ -19,55 +19,63 @@
 	}
 
 	// Constants
-	const TIME_INTERVAL = 30;
-	const DEFAULT_START_TIME = '09:00';
-	const DEFAULT_END_TIME = '17:00';
+	const TIME_INTERVAL: number = 30;
+	const DEFAULT_START_TIME: string = '09:00';
+	const DEFAULT_END_TIME: string = '17:00';
 
 	// State management
-	let eventName = $state('');
-	let currentMonth = $state(new Date());
+	let eventName: string = $state('');
+	let currentMonth: Date = $state(new Date());
 	let selectedDates: Date[] = $state([]);
 	let selectedTimes: string[] = $state([]);
-	let startTime = $state(DEFAULT_START_TIME);
-	let endTime = $state(DEFAULT_END_TIME);
-	let selectedTimeZone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
+	let startTime: string = $state(DEFAULT_START_TIME);
+	let endTime: string = $state(DEFAULT_END_TIME);
+	let selectedTimeZone: string = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
 	// Derived state
-	let selectedDatesSet = $derived(new Set(selectedDates.map((d) => d.getTime())));
-	let selectedTimesSet = $derived(new Set(selectedTimes));
-	let calendarDays = $derived(generateCalendarDays(currentMonth));
-	let timeSlots = $derived(generateTimeSlots(startTime, endTime, TIME_INTERVAL));
-	let sortedSelectedDates = $derived([...selectedDates].sort((a, b) => a.getTime() - b.getTime()));
+	let selectedDatesSet: Set<number> = $derived(
+		new Set(selectedDates.map((d: Date) => d.getTime()))
+	);
+	let selectedTimesSet: Set<string> = $derived(new Set(selectedTimes));
+	let calendarDays: CalendarDay[] = $derived(generateCalendarDays(currentMonth));
+	let timeSlots: { time: string; formatted: string }[] = $derived(
+		generateTimeSlots(startTime, endTime, TIME_INTERVAL)
+	);
+	let sortedSelectedDates: Date[] = $derived(
+		[...selectedDates].sort((a: Date, b: Date) => a.getTime() - b.getTime())
+	);
 
 	// Time zones
-	const timeZones: TimeZone[] = Intl.supportedValuesOf('timeZone').map((tz) => ({
+	const timeZones: TimeZone[] = Intl.supportedValuesOf('timeZone').map((tz: string) => ({
 		value: tz,
 		label: tz.replace(/_/g, ' ')
 	}));
 
 	// Calendar functions
 	function generateCalendarDays(date: Date): CalendarDay[] {
-		const start = startOfMonth(date);
-		const end = endOfMonth(date);
-		const days = eachDayOfInterval({ start, end });
-		const firstDayOfWeek = start.getDay();
-		const today = new Date();
+		const start: Date = startOfMonth(date);
+		const end: Date = endOfMonth(date);
+		const days: Date[] = eachDayOfInterval({ start, end });
+		const firstDayOfWeek: number = start.getDay();
+		const today: Date = new Date();
 
-		const paddingDays = Array(firstDayOfWeek)
+		const paddingDays: CalendarDay[] = Array(firstDayOfWeek)
 			.fill(null)
 			.map((_, index) => {
-				const paddingDate = new Date(start);
+				const paddingDate: Date = new Date(start);
 				paddingDate.setDate(start.getDate() - (firstDayOfWeek - index));
 				return createCalendarDay(paddingDate, false, today);
 			});
 
-		const calendarDays = days.map((day) => createCalendarDay(day, true, today));
+		const calendarDays: CalendarDay[] = days.map((day: Date) =>
+			createCalendarDay(day, true, today)
+		);
 
-		const remainingDays = 6 - end.getDay();
-		const endPaddingDays = Array(remainingDays)
+		const remainingDays: number = 6 - end.getDay();
+		const endPaddingDays: CalendarDay[] = Array(remainingDays)
 			.fill(null)
 			.map((_, index) => {
-				const paddingDate = new Date(end);
+				const paddingDate: Date = new Date(end);
 				paddingDate.setDate(end.getDate() + (index + 1));
 				return createCalendarDay(paddingDate, false, today);
 			});
@@ -86,12 +94,16 @@
 	}
 
 	// Time functions
-	function generateTimeSlots(start: string, end: string, interval: number) {
-		const slots = [];
+	function generateTimeSlots(
+		start: string,
+		end: string,
+		interval: number
+	): { time: string; formatted: string }[] {
+		const slots: { time: string; formatted: string }[] = [];
 		for (let time = 0; time < 24 * 60; time += interval) {
-			const hours = Math.floor(time / 60);
-			const minutes = time % 60;
-			const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+			const hours: number = Math.floor(time / 60);
+			const minutes: number = time % 60;
+			const timeString: string = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 			slots.push({
 				time: timeString,
 				formatted: convertTo12Hour(timeString)
@@ -101,39 +113,35 @@
 	}
 
 	function convertTo12Hour(time24h: string): string {
-		const [hours, minutes] = time24h.split(':').map(Number);
-		const period = hours >= 12 ? 'PM' : 'AM';
-		const displayHours = hours % 12 || 12;
+		const [hours, minutes]: number[] = time24h.split(':').map(Number);
+		const period: string = hours >= 12 ? 'PM' : 'AM';
+		const displayHours: number = hours % 12 || 12;
 		return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 	}
 
-	// New function to convert time string to minutes
 	function timeToMinutes(time: string): number {
-		const [hours, minutes] = time.split(':').map(Number);
+		const [hours, minutes]: number[] = time.split(':').map(Number);
 		return hours * 60 + minutes;
 	}
 
-	// New function to auto-select time slots
 	function updateSelectedTimeSlots(): void {
-		const startMinutes = timeToMinutes(startTime);
-		const endMinutes = timeToMinutes(endTime);
+		const startMinutes: number = timeToMinutes(startTime);
+		const endMinutes: number = timeToMinutes(endTime);
 
 		selectedTimes = timeSlots
 			.filter((slot) => {
-				const slotMinutes = timeToMinutes(slot.time);
+				const slotMinutes: number = timeToMinutes(slot.time);
 				return slotMinutes >= startMinutes && slotMinutes <= endMinutes;
 			})
 			.map((slot) => slot.time);
 	}
 
-	// Modified time selection handlers
-	// Use this:
 	$effect(() => {
 		if (startTime && endTime) {
 			updateSelectedTimeSlots();
 		}
 	});
-	// Event handlers
+
 	const navigationHandlers = {
 		today: () => (currentMonth = new Date()),
 		previousMonth: () =>
@@ -143,13 +151,13 @@
 
 	function toggleDateSelection(date: Date): void {
 		selectedDates = selectedDatesSet.has(date.getTime())
-			? selectedDates.filter((d) => !isSameDay(d, date))
+			? selectedDates.filter((d: Date) => !isSameDay(d, date))
 			: [...selectedDates, date];
 	}
 
 	function toggleTimeSelection(time: string): void {
 		selectedTimes = selectedTimesSet.has(time)
-			? selectedTimes.filter((t) => t !== time)
+			? selectedTimes.filter((t: string) => t !== time)
 			: [...selectedTimes, time];
 	}
 
@@ -162,7 +170,7 @@
 		const eventData = {
 			id: uuidv4(),
 			name: eventName,
-			dates: selectedDates.map((date) => date.toISOString()),
+			dates: selectedDates.map((date: Date) => date.toISOString()),
 			timeSlots: selectedTimes,
 			timeZone: selectedTimeZone
 		};
@@ -180,6 +188,79 @@
 			alert('Failed to create event. Please try again.');
 		}
 	}
+
+	let isDragging: boolean = false;
+	let dragMode: 'select' | 'deselect' | null = null;
+	let dragStart: HTMLButtonElement | null = null;
+
+	function handleDragStart(event: MouseEvent): void {
+		const cell = (event.target as HTMLElement).closest('button');
+		if (!cell) return;
+
+		isDragging = true;
+		dragStart = cell as HTMLButtonElement;
+		dragMode = cell.classList.contains('bg-blue-600') ? 'deselect' : 'select';
+	}
+
+	function handleDragMove(event: MouseEvent): void {
+		if (!isDragging) return;
+
+		const cell = (event.target as HTMLElement).closest('button');
+		if (!cell) return;
+
+		clearDragStyling();
+
+		const cells = getCellsInRange(dragStart!, cell as HTMLButtonElement);
+		cells.forEach((cell) => {
+			cell.classList.add(dragMode === 'select' ? 'drag-select' : 'drag-deselect');
+		});
+	}
+
+	function handleDragEnd(): void {
+		if (!isDragging) return;
+
+		document.querySelectorAll('.drag-select').forEach((cell) => {
+			cell.classList.add('bg-blue-600', 'text-white');
+
+			const selectedDates = new Set<Date>();
+			selectedDates.add(new Date((cell as HTMLButtonElement).dataset.date!));
+		});
+		document.querySelectorAll('.drag-deselect').forEach((cell) => {
+			cell.classList.remove('bg-blue-600', 'text-white');
+			const selectedDates = new Set<Date>();
+			selectedDates.delete(new Date((cell as HTMLButtonElement).dataset.date!));
+		});
+
+		clearDragStyling();
+		isDragging = false;
+		dragStart = null;
+	}
+
+	function clearDragStyling(): void {
+		document.querySelectorAll('.drag-select, .drag-deselect').forEach((cell) => {
+			cell.classList.remove('drag-select', 'drag-deselect');
+		});
+	}
+
+	function getCellsInRange(start: HTMLButtonElement, end: HTMLButtonElement): HTMLButtonElement[] {
+		const cellsInRange: HTMLButtonElement[] = [];
+		const startDate = new Date(start.dataset.date!);
+		const endDate = new Date(end.dataset.date!);
+
+		const minDate = startDate < endDate ? startDate : endDate;
+		const maxDate = startDate > endDate ? startDate : endDate;
+
+		calendarDays.forEach((day) => {
+			const date = new Date(day.date);
+			if (date >= minDate && date <= maxDate) {
+				cellsInRange.push(
+					document.querySelector(`[data-date="${date.toISOString()}"]`) as HTMLButtonElement
+				);
+			}
+		});
+
+		return cellsInRange;
+	}
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-gray-50 to-white">
@@ -191,14 +272,13 @@
 				type="text"
 				placeholder="Enter event name"
 				class="w-full rounded-lg border border-gray-300 bg-white px-6 py-4
-					text-center font-medium text-gray-900 placeholder-gray-400
-					transition-all"
+			text-center font-medium text-gray-900 placeholder-gray-400
+			transition-all"
 				bind:value={eventName}
 			/>
 		</div>
 
 		<div class="flex flex-col justify-center justify-items-center gap-16 md:flex-row">
-			<!-- Calendar Card -->
 			<div class="shadow-xs h-fit rounded-lg border border-gray-200 bg-white p-4 md:w-80">
 				<div class="mb-3 flex items-center justify-between">
 					<button
@@ -238,7 +318,13 @@
 					</button>
 				</div>
 
-				<div class="grid grid-cols-7 gap-1">
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="grid grid-cols-7 gap-1"
+					onmousedown={handleDragStart}
+					onmousemove={handleDragMove}
+					onmouseup={handleDragEnd}
+				>
 					{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day}
 						<div class="py-2 text-center text-xs font-medium uppercase text-gray-500">
 							{day}
@@ -248,30 +334,20 @@
 					{#each calendarDays as day (day.date.getTime())}
 						<button
 							class="aspect-square rounded-md text-sm font-medium
-                                {!day.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
-                                {day.isToday ? 'ring-1 ring-blue-500' : ''}
-                                {selectedDatesSet.has(day.date.getTime())
+				  {!day.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
+				  {day.isToday ? 'ring-1 ring-blue-500' : ''}
+				  {selectedDatesSet.has(day.date.getTime())
 								? 'bg-blue-600 text-white hover:bg-blue-700'
 								: 'hover:bg-blue-50'}"
+							data-date={day.date}
 							onclick={() => toggleDateSelection(day.date)}
 						>
 							{day.dayLabel}
 						</button>
 					{/each}
 				</div>
-
-				<!-- {#if selectedDates.length > 0}
-					<div class="mt-4 flex flex-wrap gap-2">
-						{#each sortedSelectedDates as date}
-							<span class="rounded-md bg-blue-100 px-2.5 py-1 text-sm text-blue-700">
-								{format(date, 'MMM d')}
-							</span>
-						{/each}
-					</div>
-				{/if} -->
 			</div>
 
-			<!-- Time Selection Card -->
 			<div class="shadow-xs w-96 rounded-lg border border-gray-200 bg-white p-6">
 				<div class="mb-6 grid grid-cols-2 gap-4">
 					<div>
@@ -282,7 +358,7 @@
 							id="startTime"
 							bind:value={startTime}
 							class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
-								text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+				  text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
 						>
 							{#each timeSlots as timeOption}
 								<option value={timeOption.time}>{timeOption.formatted}</option>
@@ -297,7 +373,7 @@
 							id="endTime"
 							bind:value={endTime}
 							class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
-								text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+				  text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
 						>
 							{#each timeSlots as timeOption}
 								<option value={timeOption.time}>{timeOption.formatted}</option>
@@ -314,7 +390,7 @@
 						id="timezone"
 						bind:value={selectedTimeZone}
 						class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
-							text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+				text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
 					>
 						{#each timeZones as tz}
 							<option value={tz.value}>{tz.label}</option>
@@ -326,7 +402,7 @@
 					{#each timeSlots as timeSlot (timeSlot.time)}
 						<button
 							class="rounded-sm px-3 py-2 text-xs font-medium transition-colors
-                                {selectedTimesSet.has(timeSlot.time)
+				  {selectedTimesSet.has(timeSlot.time)
 								? 'bg-blue-600 text-white hover:bg-blue-700'
 								: 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
 							onclick={() => toggleTimeSelection(timeSlot.time)}
@@ -342,9 +418,9 @@
 			<button
 				onclick={handleSubmit}
 				class="rounded-md bg-blue-600 px-8 py-3 text-sm font-semibold text-white
-					shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline
-					focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600
-					disabled:cursor-not-allowed disabled:opacity-50"
+			shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline
+			focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600
+			disabled:cursor-not-allowed disabled:opacity-50"
 				disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
 			>
 				Create Event
@@ -354,3 +430,35 @@
 
 	<Footer />
 </div>
+
+<style>
+	.drag-select {
+		border: none;
+		color: white;
+	}
+
+	.drag-deselect {
+		border: none;
+		color: black;
+	}
+
+	.drag-select::after,
+	.drag-deselect::after {
+		content: '';
+		position: absolute;
+		top: -1.5px;
+		left: -1.5px;
+		right: -1.5px;
+		bottom: -1.5px;
+		z-index: -1;
+		pointer-events: none;
+	}
+
+	.drag-select::after {
+		background-color: #10b981;
+	}
+
+	.drag-deselect::after {
+		background-color: white;
+	}
+</style>
