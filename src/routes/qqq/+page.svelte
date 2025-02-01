@@ -1,4 +1,3 @@
-<!-- Calendar.svelte -->
 <script lang="ts">
 	import { onMount } from 'svelte';
 
@@ -181,8 +180,8 @@
 <div
 	bind:this={calendar}
 	class="calendar"
-	on:mousedown={handleDragStart}
-	on:mousemove={(e) => {
+	onmousedown={handleDragStart}
+	onmousemove={(e) => {
 		if (!isDragging) return;
 		if (!rafPending) {
 			rafPending = true;
