@@ -287,4 +287,19 @@
 	:global(.transitioning)::after {
 		opacity: 1;
 	}
+
+	:global(.drag-select)::after,
+	:global(.drag-deselect)::after,
+	:global(.transitioning.drag-select)::after,
+	:global(.transitioning.drag-deselect)::after {
+		content: '';
+		position: absolute;
+		top: -2px;
+		left: -2px;
+		right: -2px;
+		bottom: -2px;
+		z-index: -1;
+		pointer-events: none;
+		transition: opacity 0.15s ease-out;
+	}
 </style>
