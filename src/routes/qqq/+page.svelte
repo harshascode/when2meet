@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 
-	let calendar: HTMLElement;
 	let isDragging = false;
 	let dragStart: HTMLDivElement | null = null;
 	let dragMode: 'select' | 'deselect' | null = null;
@@ -10,46 +9,21 @@
 	let rafPending = false;
 	let dragged = false;
 
+	const daysOfWeek = ['', 'S', 'M', 'T', 'W', 'T', 'F', 'S'];
+	const weeks = [1, 2, 3, 4, 5];
+
 	onMount(() => {
-		initCalendar();
+		// Initialize cells array
+		document.querySelectorAll('.cell:not(.header):not(.month-label)').forEach((cell) => {
+			const row = parseInt(cell.getAttribute('data-row') || '0');
+			const col = parseInt(cell.getAttribute('data-col') || '0');
+			if (!cells[row]) cells[row] = [];
+			cells[row][col] = cell as HTMLDivElement;
+		});
+
 		document.addEventListener('mouseup', handleDragEnd);
 		return () => document.removeEventListener('mouseup', handleDragEnd);
 	});
-
-	function initCalendar() {
-		// Create header row
-		const daysOfWeek = ['', 'S', 'M', 'T', 'W', 'T', 'F', 'S'];
-		daysOfWeek.forEach((day) => {
-			const cell = createCell(day, 'header');
-			calendar.appendChild(cell);
-		});
-
-		// Create calendar rows
-		for (let row = 1; row <= 5; row++) {
-			// Month label for each row
-			const monthLabel = createCell('Feb', 'month-label');
-			calendar.appendChild(monthLabel);
-
-			// Date cells for the row
-			let rowCells: HTMLDivElement[] = [];
-			for (let col = 1; col <= 7; col++) {
-				const date = (row - 1) * 7 + col;
-				const cell = createCell(date.toString());
-				cell.setAttribute('data-row', row.toString());
-				cell.setAttribute('data-col', col.toString());
-				calendar.appendChild(cell);
-				rowCells[col] = cell;
-			}
-			cells[row] = rowCells;
-		}
-	}
-
-	function createCell(content: string | number, className = '') {
-		const cell = document.createElement('div');
-		cell.className = `cell ${className}`.trim();
-		cell.textContent = content.toString();
-		return cell;
-	}
 
 	function handleDragStart(e: MouseEvent & { currentTarget: HTMLDivElement }) {
 		const cell = (e.target as HTMLElement).closest(
@@ -77,8 +51,8 @@
 
 		clearDragStyling();
 
-		const cells = getCellsInRange(dragStart, cell);
-		cells.forEach((cell) => {
+		const cellsInRange = getCellsInRange(dragStart, cell);
+		cellsInRange.forEach((cell) => {
 			cell.classList.add(dragMode === 'select' ? 'drag-select' : 'drag-deselect');
 		});
 	}
@@ -175,10 +149,16 @@
 			}
 		}
 	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			toggleCell(e as unknown as MouseEvent);
+		}
+	}
 </script>
 
 <div
-	bind:this={calendar}
 	class="calendar"
 	onmousedown={handleDragStart}
 	onmousemove={(e) => {
@@ -194,7 +174,36 @@
 	role="grid"
 	tabindex="0"
 	aria-label="Calendar Selection Grid"
-></div>
+>
+	<!-- Header Row -->
+	{#each daysOfWeek as day}
+		<div class="cell header" role="columnheader">{day}</div>
+	{/each}
+
+	<!-- Calendar Rows -->
+	{#each weeks as week}
+		<!-- Month Label -->
+		<div class="cell month-label" role="rowheader">Feb</div>
+
+		<!-- Date Cells -->
+		{#each Array(7) as _, i}
+			{@const date = (week - 1) * 7 + (i + 1)}
+			<div
+				class="cell"
+				data-row={week}
+				data-col={i + 1}
+				role="gridcell"
+				tabindex="0"
+				onclick={toggleCell}
+				onkeydown={handleKeyDown}
+				aria-selected={selectedDates.has(`${week}-${i + 1}`)}
+				aria-label={`Select ${date}`}
+			>
+				{date}
+			</div>
+		{/each}
+	{/each}
+</div>
 
 <style>
 	.calendar {
@@ -205,7 +214,7 @@
 		user-select: none;
 	}
 
-	:global(.cell) {
+	.cell {
 		width: 40px;
 		height: 40px;
 		border: 1px solid #ccc;
@@ -218,13 +227,13 @@
 		position: relative;
 	}
 
-	:global(.header) {
+	.header {
 		font-weight: bold;
 		background-color: #f0f0f0;
 		cursor: default;
 	}
 
-	:global(.month-label) {
+	.month-label {
 		text-align: right;
 		padding-right: 10px;
 	}
@@ -256,10 +265,10 @@
 	:global(.transitioning.drag-deselect)::after {
 		content: '';
 		position: absolute;
-		top: -1.5px;
-		left: -1.5px;
-		right: -1.5px;
-		bottom: -1.5px;
+		top: -2px;
+		left: -2px;
+		right: -2px;
+		bottom: -2px;
 		z-index: -1;
 		pointer-events: none;
 		transition: opacity 0.15s ease-out;
