@@ -197,7 +197,7 @@
 			/>
 		</div>
 
-		<div class="flex flex-col justify-center justify-items-center gap-6 md:flex-row">
+		<div class="flex flex-col justify-center justify-items-center gap-16 md:flex-row">
 			<!-- Calendar Card -->
 			<div class="shadow-xs h-fit rounded-lg border border-gray-200 bg-white p-4 md:w-80">
 				<div class="mb-3 flex items-center justify-between">
