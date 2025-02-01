@@ -527,7 +527,7 @@
 						</div>
 
 						<!-- Right Grid Section -->
-						<div class="max-w-4xl gap-6 space-y-8 w-full">
+						<div class="w-full max-w-4xl gap-6 space-y-8">
 							<!-- Individual Availability Grid -->
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<div class="mb-6 flex items-center justify-between">
@@ -605,6 +605,7 @@
 							</div>
 
 							<!-- Group Availability Grid -->
+							<!-- Group Availability Grid -->
 							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 								<div class="mb-6 flex items-center justify-between">
 									<h2 class="text-lg font-semibold text-gray-900">
@@ -649,6 +650,8 @@
 																date,
 																timeSlot
 															) / 100})"
+															onmouseover={() => handleCellHover(date, timeSlot)}
+															onmouseout={handleCellLeave}
 														></div>
 													{/each}
 												{/each}
