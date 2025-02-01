@@ -32,6 +32,8 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
+	import Footer from '$lib/Footer.svelte';
+	import Header from '$lib/Header.svelte';
 
 	// ========== State Management ==========
 	const eventId = page.params.id;
@@ -404,23 +406,7 @@
 	role="presentation"
 >
 	<!-- Header Section -->
-	<header class="border-b">
-		<div class="container flex h-14 items-center px-4">
-			<div class="flex gap-6 md:gap-10">
-				<a href="/" class="flex items-center space-x-2">
-					<span class="font-bold">When2meet</span>
-				</a>
-				<nav class="flex gap-6">
-					<a
-						href="/"
-						class="text-sm font-medium text-green-600 transition-colors hover:text-green-700"
-					>
-						Plan a New Event
-					</a>
-				</nav>
-			</div>
-		</div>
-	</header>
+	<Header />
 
 	<!-- Main Content -->
 	<main class="container mx-auto max-w-7xl flex-1 px-4 py-6">
@@ -786,9 +772,7 @@
 	</main>
 
 	<!-- Footer Section -->
-	<footer class="border-t py-4 text-center text-sm text-gray-500">
-		<p>When2meet is a free service. We do not ask for contact or billing information.</p>
-	</footer>
+	<Footer />
 </div>
 
 <!-- Styles -->
