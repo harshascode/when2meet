@@ -208,7 +208,7 @@
 <style>
 	.calendar {
 		display: grid;
-		grid-template-columns: 60px repeat(7, 42px);
+		grid-template-columns: 60px repeat(7, 40px);
 		gap: 1px;
 		padding: 10px;
 		user-select: none;
@@ -222,7 +222,6 @@
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		background-color: white;
 		z-index: 2;
 		position: relative;
 	}
@@ -239,9 +238,9 @@
 	}
 
 	:global(.selected) {
-		background-color: #10b981;
 		color: white;
 		transition: background-color 0.15s ease-out;
+		background-color: #10b981;
 	}
 
 	:global(.drag-select),
@@ -281,7 +280,7 @@
 
 	:global(.drag-deselect)::after,
 	:global(.transitioning.drag-deselect)::after {
-		background-color: white;
+		background-color: rgb(236, 225, 225);
 	}
 
 	:global(.transitioning)::after {
