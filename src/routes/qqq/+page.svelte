@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 
 	interface Cell {
 		row: number;
@@ -107,6 +108,7 @@
 		});
 	}
 
+	
 	function onWindowMouseUp(event: MouseEvent) {
 		if (isDragging) {
 			handleMouseUp();
@@ -114,10 +116,15 @@
 	}
 
 	onMount(() => {
-		window.addEventListener('mouseup', onWindowMouseUp);
+		if (browser) {
+			window.addEventListener('mouseup', onWindowMouseUp);
+		}
 	});
+
 	onDestroy(() => {
-		window.removeEventListener('mouseup', onWindowMouseUp);
+		if (browser) {
+			window.removeEventListener('mouseup', onWindowMouseUp);
+		}
 	});
 </script>
 
@@ -142,6 +149,7 @@
 	{#each grid as rowData}
 		<div class="cell month-label" role="rowheader">{rowData.month}</div>
 		{#each rowData.cells as cell}
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div
 				class="cell {cell.selected ? 'selected' : ''} {isDragging && dragRange && cell.row >= dragRange.minRow && cell.row <= dragRange.maxRow && cell.col >= dragRange.minCol && cell.col <= dragRange.maxCol ? (dragMode === 'select' ? 'drag-select' : 'drag-deselect') : ''}"
 				data-row={cell.row}
@@ -198,9 +206,11 @@
 	}
 	.drag-select {
 		color: white;
+		background-color: #10b981;
 	}
 	.drag-deselect {
 		color: black;
+		background-color: #efe7e7;
 	}
 	.drag-select::after,
 	.drag-deselect::after {
