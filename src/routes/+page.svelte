@@ -31,6 +31,7 @@
 	let startTime: string = $state(DEFAULT_START_TIME);
 	let endTime: string = $state(DEFAULT_END_TIME);
 	let selectedTimeZone: string = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
+	let showEventNameError: boolean = $state(false);
 
 	// Derived state
 	let selectedDatesSet: Set<number> = $derived(
@@ -162,7 +163,17 @@
 	}
 
 	async function handleSubmit(): Promise<void> {
-		if (!eventName || !selectedDates.length || !selectedTimes.length) {
+		showEventNameError = false;
+		
+		if (!eventName.trim()) {
+			showEventNameError = true;
+			const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+			input?.focus();
+			alert('Please fill in all required fields');
+			return;
+		}
+
+		if (!selectedDates.length || !selectedTimes.length) {
 			alert('Please fill in all required fields');
 			return;
 		}
@@ -271,11 +282,15 @@
 			<input
 				type="text"
 				placeholder="Enter event name"
-				class="w-full rounded-lg border border-gray-300 bg-white px-6 py-4
+				class="w-full rounded-lg border {showEventNameError ? 'border-red-500' : 'border-gray-300'} bg-white px-6 py-4
 			text-center font-medium text-gray-900 placeholder-gray-400
 			transition-all"
 				bind:value={eventName}
+				oninput={() => showEventNameError = false}
 			/>
+			{#if showEventNameError}
+				<p class="mt-2 text-center text-sm text-red-600">Please enter an event name</p>
+			{/if}
 		</div>
 
 		<div class="flex flex-col justify-center justify-items-center gap-16 md:flex-row">
