@@ -1,205 +1,159 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
-	let isDragging = false;
-	let dragStart: HTMLDivElement | null = null;
-	let dragMode: 'select' | 'deselect' | null = null;
-	let selectedDates = new Set<string>();
-	let cells: (HTMLDivElement | null)[][] = [];
-	let rafPending = false;
-	let dragged = false;
-
-	const daysOfWeek = ['', 'S', 'M', 'T', 'W', 'T', 'F', 'S'];
-	const weeks = [1, 2, 3, 4, 5];
-
-	onMount(() => {
-		// Initialize cells array
-		document.querySelectorAll('.cell:not(.header):not(.month-label)').forEach((cell) => {
-			const row = parseInt(cell.getAttribute('data-row') || '0');
-			const col = parseInt(cell.getAttribute('data-col') || '0');
-			if (!cells[row]) cells[row] = [];
-			cells[row][col] = cell as HTMLDivElement;
-		});
-
-		document.addEventListener('mouseup', handleDragEnd);
-		return () => document.removeEventListener('mouseup', handleDragEnd);
-	});
-
-	function handleDragStart(e: MouseEvent & { currentTarget: HTMLDivElement }) {
-		const cell = (e.target as HTMLElement).closest(
-			'.cell:not(.header):not(.month-label)'
-		) as HTMLDivElement | null;
-		if (!cell) return;
-
-		isDragging = true;
-		dragStart = cell;
-		dragged = false;
-		dragMode = cell.classList.contains('selected') ? 'deselect' : 'select';
+	interface Cell {
+		row: number;
+		col: number;
+		date: number;
+		selected: boolean;
 	}
 
-	function handleDragMove(e: MouseEvent) {
+	interface Row {
+		month: string;
+		cells: Cell[];
+	}
+
+	const weeks = [1, 2, 3, 4, 5];
+	let grid: Row[] = weeks.map((week) => ({
+		month: 'Feb',
+		cells: Array.from({ length: 7 }, (_, i) => ({
+			row: week,
+			col: i + 1,
+			date: (week - 1) * 7 + (i + 1),
+			selected: false
+		}))
+	}));
+
+	// Drag state variables.
+	let isDragging = false;
+	let dragStart: { row: number; col: number } | null = null;
+	let dragMode: 'select' | 'deselect' | null = null;
+	let dragged = false;
+	let dragRange: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null = null;
+
+	function handleMouseDown(cell: Cell, event: MouseEvent) {
+		isDragging = true;
+		dragStart = { row: cell.row, col: cell.col };
+		dragged = false;
+		dragMode = cell.selected ? 'deselect' : 'select';
+		dragRange = { minRow: cell.row, maxRow: cell.row, minCol: cell.col, maxCol: cell.col };
+	}
+
+	function handleMouseMove(event: MouseEvent) {
 		if (!isDragging || !dragStart) return;
+		const targetElement = (event.target as HTMLElement).closest('.cell');
+		// Ensure the target is an HTMLElement so that dataset exists.
+		if (targetElement instanceof HTMLElement && targetElement.dataset.row && targetElement.dataset.col) {
+			const row = Number(targetElement.dataset.row);
+			const col = Number(targetElement.dataset.col);
+			dragRange = {
+				minRow: Math.min(dragStart.row, row),
+				maxRow: Math.max(dragStart.row, row),
+				minCol: Math.min(dragStart.col, col),
+				maxCol: Math.max(dragStart.col, col)
+			};
+			if (row !== dragStart.row || col !== dragStart.col) {
+				dragged = true;
+			}
+		}
+	}
 
-		const cell = (e.target as HTMLElement).closest(
-			'.cell:not(.header):not(.month-label)'
-		) as HTMLDivElement | null;
-		if (!cell) return;
-
-		if (cell !== dragStart) {
-			dragged = true;
+	function handleMouseUp() {
+		if (!isDragging || !dragRange) {
+			resetDrag();
+			return;
 		}
 
-		clearDragStyling();
-
-		const cellsInRange = getCellsInRange(dragStart, cell);
-		cellsInRange.forEach((cell) => {
-			cell.classList.add(dragMode === 'select' ? 'drag-select' : 'drag-deselect');
+		// Update cells within the drag range.
+		grid = grid.map((rowData) => {
+			return {
+				month: rowData.month,
+				cells: rowData.cells.map((cell) => {
+					if (
+						cell.row >= dragRange!.minRow &&
+						cell.row <= dragRange!.maxRow &&
+						cell.col >= dragRange!.minCol &&
+						cell.col <= dragRange!.maxCol
+					) {
+						return { ...cell, selected: dragMode === 'select' };
+					}
+					return cell;
+				})
+			};
 		});
+		resetDrag();
 	}
 
-	function handleDragEnd() {
-		if (!isDragging) return;
-
-		// Store the elements we need to update
-		const selectElements = Array.from(document.querySelectorAll('.drag-select'));
-		const deselectElements = Array.from(document.querySelectorAll('.drag-deselect'));
-
-		// Add a temporary class to maintain the background during transition
-		selectElements.forEach((cell) => cell.classList.add('transitioning'));
-		deselectElements.forEach((cell) => cell.classList.add('transitioning'));
-
-		// Update the selected state
-		selectElements.forEach((cell) => {
-			const row = cell.getAttribute('data-row');
-			const col = cell.getAttribute('data-col');
-			if (row && col) {
-				cell.classList.add('selected');
-				selectedDates.add(`${row}-${col}`);
-			}
-		});
-
-		deselectElements.forEach((cell) => {
-			const row = cell.getAttribute('data-row');
-			const col = cell.getAttribute('data-col');
-			if (row && col) {
-				cell.classList.remove('selected');
-				selectedDates.delete(`${row}-${col}`);
-			}
-		});
-
-		// Remove drag classes after a brief delay
-		requestAnimationFrame(() => {
-			requestAnimationFrame(() => {
-				selectElements.forEach((cell) => {
-					cell.classList.remove('drag-select', 'transitioning');
-				});
-				deselectElements.forEach((cell) => {
-					cell.classList.remove('drag-deselect', 'transitioning');
-				});
-			});
-		});
-
+	function resetDrag() {
 		isDragging = false;
 		dragStart = null;
+		dragMode = null;
 		dragged = false;
+		dragRange = null;
 	}
 
-	function clearDragStyling() {
-		document.querySelectorAll('.drag-select, .drag-deselect').forEach((cell) => {
-			cell.classList.remove('drag-select', 'drag-deselect', 'transitioning');
+	function toggleCell(cell: Cell) {
+		if (dragged) return;
+		grid = grid.map((rowData) => {
+			return {
+				month: rowData.month,
+				cells: rowData.cells.map((c) => {
+					if (c.row === cell.row && c.col === cell.col) {
+						return { ...c, selected: !c.selected };
+					}
+					return c;
+				})
+			};
 		});
 	}
 
-	function getCellsInRange(start: HTMLDivElement, end: HTMLDivElement) {
-		const cellsInRange: HTMLDivElement[] = [];
-		const startRow = parseInt(start.getAttribute('data-row') || '0');
-		const startCol = parseInt(start.getAttribute('data-col') || '0');
-		const endRow = parseInt(end.getAttribute('data-row') || '0');
-		const endCol = parseInt(end.getAttribute('data-col') || '0');
-
-		const minRow = Math.min(startRow, endRow);
-		const maxRow = Math.max(startRow, endRow);
-		const minCol = Math.min(startCol, endCol);
-		const maxCol = Math.max(startCol, endCol);
-
-		for (let row = minRow; row <= maxRow; row++) {
-			for (let col = minCol; col <= maxCol; col++) {
-				const cell = cells[row]?.[col];
-				if (cell) {
-					cellsInRange.push(cell);
-				}
-			}
-		}
-		return cellsInRange;
-	}
-
-	function toggleCell(e: MouseEvent) {
-		if (dragged) return;
-		const cell = e.currentTarget as HTMLDivElement;
-		const row = cell.getAttribute('data-row');
-		const col = cell.getAttribute('data-col');
-
-		if (row && col) {
-			if (cell.classList.contains('selected')) {
-				cell.classList.remove('selected');
-				selectedDates.delete(`${row}-${col}`);
-			} else {
-				cell.classList.add('selected');
-				selectedDates.add(`${row}-${col}`);
-			}
+	function onWindowMouseUp(event: MouseEvent) {
+		if (isDragging) {
+			handleMouseUp();
 		}
 	}
 
-	function handleKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Enter' || e.key === ' ') {
-			e.preventDefault();
-			toggleCell(e as unknown as MouseEvent);
-		}
-	}
+	onMount(() => {
+		window.addEventListener('mouseup', onWindowMouseUp);
+	});
+	onDestroy(() => {
+		window.removeEventListener('mouseup', onWindowMouseUp);
+	});
 </script>
 
 <div
 	class="calendar"
-	onmousedown={handleDragStart}
-	onmousemove={(e) => {
-		if (!isDragging) return;
-		if (!rafPending) {
-			rafPending = true;
-			requestAnimationFrame(() => {
-				handleDragMove(e);
-				rafPending = false;
-			});
-		}
-	}}
 	role="grid"
 	tabindex="0"
 	aria-label="Calendar Selection Grid"
+	on:mousemove={handleMouseMove}
 >
 	<!-- Header Row -->
-	{#each daysOfWeek as day}
-		<div class="cell header" role="columnheader">{day}</div>
-	{/each}
+	<div class="cell header"></div>
+	<div class="cell header">S</div>
+	<div class="cell header">M</div>
+	<div class="cell header">T</div>
+	<div class="cell header">W</div>
+	<div class="cell header">T</div>
+	<div class="cell header">F</div>
+	<div class="cell header">S</div>
 
 	<!-- Calendar Rows -->
-	{#each weeks as week}
-		<!-- Month Label -->
-		<div class="cell month-label" role="rowheader">Feb</div>
-
-		<!-- Date Cells -->
-		{#each Array(7) as _, i}
-			{@const date = (week - 1) * 7 + (i + 1)}
+	{#each grid as rowData}
+		<div class="cell month-label" role="rowheader">{rowData.month}</div>
+		{#each rowData.cells as cell}
 			<div
-				class="cell"
-				data-row={week}
-				data-col={i + 1}
+				class="cell {cell.selected ? 'selected' : ''} {isDragging && dragRange && cell.row >= dragRange.minRow && cell.row <= dragRange.maxRow && cell.col >= dragRange.minCol && cell.col <= dragRange.maxCol ? (dragMode === 'select' ? 'drag-select' : 'drag-deselect') : ''}"
+				data-row={cell.row}
+				data-col={cell.col}
 				role="gridcell"
 				tabindex="0"
-				onclick={toggleCell}
-				onkeydown={handleKeyDown}
-				aria-selected={selectedDates.has(`${week}-${i + 1}`)}
-				aria-label={`Select ${date}`}
+				aria-selected={cell.selected}
+				aria-label="Select {cell.date}"
+				on:mousedown={(e) => handleMouseDown(cell, e)}
+				on:click={() => toggleCell(cell)}
 			>
-				{date}
+				{cell.date}
 			</div>
 		{/each}
 	{/each}
@@ -208,12 +162,11 @@
 <style>
 	.calendar {
 		display: grid;
-		grid-template-columns: 60px repeat(7, 40px);
+		grid-template-columns: 60px repeat(7, 42px);
 		gap: 1px;
 		padding: 10px;
 		user-select: none;
 	}
-
 	.cell {
 		width: 40px;
 		height: 40px;
@@ -222,83 +175,48 @@
 		align-items: center;
 		justify-content: center;
 		cursor: pointer;
-		z-index: 2;
+		background-color: white;
 		position: relative;
+		transition: background-color 0.2s, border 0.2s;
 	}
-
 	.header {
 		font-weight: bold;
 		background-color: #f0f0f0;
 		cursor: default;
 	}
-
 	.month-label {
 		text-align: right;
 		padding-right: 10px;
 	}
-
-	:global(.selected) {
-		color: white;
-		transition: background-color 0.15s ease-out;
+	.selected {
 		background-color: #10b981;
+		color: white;
 	}
-
-	:global(.drag-select),
-	:global(.drag-deselect) {
+	.drag-select,
+	.drag-deselect {
 		border: none;
 	}
-
-	:global(.drag-select),
-	:global(.transitioning.drag-select) {
+	.drag-select {
 		color: white;
 	}
-
-	:global(.drag-deselect),
-	:global(.transitioning.drag-deselect) {
+	.drag-deselect {
 		color: black;
 	}
-
-	:global(.drag-select)::after,
-	:global(.drag-deselect)::after,
-	:global(.transitioning.drag-select)::after,
-	:global(.transitioning.drag-deselect)::after {
-		content: '';
+	.drag-select::after,
+	.drag-deselect::after {
+		content: "";
 		position: absolute;
-		top: -2px;
-		left: -2px;
-		right: -2px;
-		bottom: -2px;
+		top: -1.5px;
+		left: -1.5px;
+		right: -1.5px;
+		bottom: -1.5px;
 		z-index: -1;
 		pointer-events: none;
-		transition: opacity 0.15s ease-out;
 	}
-
-	:global(.drag-select)::after,
-	:global(.transitioning.drag-select)::after {
+	.drag-select::after {
 		background-color: #10b981;
 	}
-
-	:global(.drag-deselect)::after,
-	:global(.transitioning.drag-deselect)::after {
-		background-color: rgb(236, 225, 225);
-	}
-
-	:global(.transitioning)::after {
-		opacity: 1;
-	}
-
-	:global(.drag-select)::after,
-	:global(.drag-deselect)::after,
-	:global(.transitioning.drag-select)::after,
-	:global(.transitioning.drag-deselect)::after {
-		content: '';
-		position: absolute;
-		top: -2px;
-		left: -2px;
-		right: -2px;
-		bottom: -2px;
-		z-index: -1;
-		pointer-events: none;
-		transition: opacity 0.15s ease-out;
+	.drag-deselect::after {
+		background-color: white;
 	}
 </style>
