@@ -1,447 +1,567 @@
+<!-- @migration-task Error while migrating Svelte code: `$:` is not allowed in runes mode, use `$derived` or `$effect` instead
+https://svelte.dev/e/legacy_reactive_statement_invalid -->
 <script lang="ts">
 	import Footer from '$lib/Footer.svelte';
 	import Header from '$lib/Header.svelte';
-	import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 	import { v4 as uuidv4 } from 'uuid';
-
-	// Types
-	interface CalendarDay {
-		date: Date;
-		isCurrentMonth: boolean;
-		dayLabel: string;
-		ariaLabel: string;
-		isToday: boolean;
-	}
-
-	interface TimeZone {
-		value: string;
-		label: string;
-	}
-
+  
+	// ======================
+	// EVENT & TIME STATE CODE
+	// ======================
 	// Constants
 	const TIME_INTERVAL: number = 30;
 	const DEFAULT_START_TIME: string = '09:00';
 	const DEFAULT_END_TIME: string = '17:00';
-
-	// State management
+  
+	// State management for event details
 	let eventName: string = $state('');
-	let currentMonth: Date = $state(new Date());
-	let selectedDates: Date[] = $state([]);
+	let selectedDates: Date[] = $state([]);  
 	let selectedTimes: string[] = $state([]);
 	let startTime: string = $state(DEFAULT_START_TIME);
 	let endTime: string = $state(DEFAULT_END_TIME);
 	let selectedTimeZone: string = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
 	let showEventNameError: boolean = $state(false);
-
-	// Derived state
-	let selectedDatesSet: Set<number> = $derived(
-		new Set(selectedDates.map((d: Date) => d.getTime()))
-	);
-	let selectedTimesSet: Set<string> = $derived(new Set(selectedTimes));
-	let calendarDays: CalendarDay[] = $derived(generateCalendarDays(currentMonth));
-	let timeSlots: { time: string; formatted: string }[] = $derived(
-		generateTimeSlots(startTime, endTime, TIME_INTERVAL)
-	);
-	let sortedSelectedDates: Date[] = $derived(
-		[...selectedDates].sort((a: Date, b: Date) => a.getTime() - b.getTime())
-	);
-
+  
 	// Time zones
-	const timeZones: TimeZone[] = Intl.supportedValuesOf('timeZone').map((tz: string) => ({
-		value: tz,
-		label: tz.replace(/_/g, ' ')
+	const timeZones: { value: string; label: string }[] = Intl.supportedValuesOf('timeZone').map((tz: string) => ({
+	  value: tz,
+	  label: tz.replace(/_/g, ' ')
 	}));
-
-	// Calendar functions
-	function generateCalendarDays(date: Date): CalendarDay[] {
-		const start: Date = startOfMonth(date);
-		const end: Date = endOfMonth(date);
-		const days: Date[] = eachDayOfInterval({ start, end });
-		const firstDayOfWeek: number = start.getDay();
-		const today: Date = new Date();
-
-		const paddingDays: CalendarDay[] = Array(firstDayOfWeek)
-			.fill(null)
-			.map((_, index) => {
-				const paddingDate: Date = new Date(start);
-				paddingDate.setDate(start.getDate() - (firstDayOfWeek - index));
-				return createCalendarDay(paddingDate, false, today);
-			});
-
-		const calendarDays: CalendarDay[] = days.map((day: Date) =>
-			createCalendarDay(day, true, today)
-		);
-
-		const remainingDays: number = 6 - end.getDay();
-		const endPaddingDays: CalendarDay[] = Array(remainingDays)
-			.fill(null)
-			.map((_, index) => {
-				const paddingDate: Date = new Date(end);
-				paddingDate.setDate(end.getDate() + (index + 1));
-				return createCalendarDay(paddingDate, false, today);
-			});
-
-		return [...paddingDays, ...calendarDays, ...endPaddingDays];
+  
+	// Generate time slots for selection
+	function generateTimeSlots(start: string, end: string, interval: number): { time: string; formatted: string }[] {
+	  const slots: { time: string; formatted: string }[] = [];
+	  for (let time = 0; time < 24 * 60; time += interval) {
+		const hours: number = Math.floor(time / 60);
+		const minutes: number = time % 60;
+		const timeString: string = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+		slots.push({
+		  time: timeString,
+		  formatted: convertTo12Hour(timeString)
+		});
+	  }
+	  return slots;
 	}
-
-	function createCalendarDay(date: Date, isCurrentMonth: boolean, today: Date): CalendarDay {
-		return {
-			date,
-			isCurrentMonth,
-			dayLabel: format(date, 'd'),
-			ariaLabel: format(date, 'MMMM d, yyyy'),
-			isToday: isSameDay(date, today)
-		};
-	}
-
-	// Time functions
-	function generateTimeSlots(
-		start: string,
-		end: string,
-		interval: number
-	): { time: string; formatted: string }[] {
-		const slots: { time: string; formatted: string }[] = [];
-		for (let time = 0; time < 24 * 60; time += interval) {
-			const hours: number = Math.floor(time / 60);
-			const minutes: number = time % 60;
-			const timeString: string = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-			slots.push({
-				time: timeString,
-				formatted: convertTo12Hour(timeString)
-			});
-		}
-		return slots;
-	}
-
+  
 	function convertTo12Hour(time24h: string): string {
-		const [hours, minutes]: number[] = time24h.split(':').map(Number);
-		const period: string = hours >= 12 ? 'PM' : 'AM';
-		const displayHours: number = hours % 12 || 12;
-		return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+	  const [hours, minutes]: number[] = time24h.split(':').map(Number);
+	  const period: string = hours >= 12 ? 'PM' : 'AM';
+	  const displayHours: number = hours % 12 || 12;
+	  return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 	}
-
-	function timeToMinutes(time: string): number {
-		const [hours, minutes]: number[] = time.split(':').map(Number);
-		return hours * 60 + minutes;
-	}
-
-	function updateSelectedTimeSlots(): void {
-		const startMinutes: number = timeToMinutes(startTime);
-		const endMinutes: number = timeToMinutes(endTime);
-
-		selectedTimes = timeSlots
-			.filter((slot) => {
-				const slotMinutes: number = timeToMinutes(slot.time);
-				return slotMinutes >= startMinutes && slotMinutes <= endMinutes;
-			})
-			.map((slot) => slot.time);
-	}
-
-	$effect(() => {
-		if (startTime && endTime) {
-			updateSelectedTimeSlots();
-		}
-	});
-
-	const navigationHandlers = {
-		today: () => (currentMonth = new Date()),
-		previousMonth: () =>
-			(currentMonth = new Date(currentMonth.setMonth(currentMonth.getMonth() - 1))),
-		nextMonth: () => (currentMonth = new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))
-	};
-
-	function toggleDateSelection(date: Date): void {
-		selectedDates = selectedDatesSet.has(date.getTime())
-			? selectedDates.filter((d: Date) => !isSameDay(d, date))
-			: [...selectedDates, date];
-	}
-
+  
+	const timeSlots: { time: string; formatted: string }[] = $derived(generateTimeSlots(startTime, endTime, TIME_INTERVAL));
+  
 	function toggleTimeSelection(time: string): void {
-		selectedTimes = selectedTimesSet.has(time)
-			? selectedTimes.filter((t: string) => t !== time)
-			: [...selectedTimes, time];
+	  if (selectedTimes.includes(time)) {
+		selectedTimes = selectedTimes.filter((t: string) => t !== time);
+	  } else {
+		selectedTimes = [...selectedTimes, time];
+	  }
 	}
-
+  
+	// Update selected times when start/end time changes.
+	$effect(() => {
+	  if (startTime && endTime) {
+		const startMinutes = timeToMinutes(startTime);
+		const endMinutes = timeToMinutes(endTime);
+		selectedTimes = timeSlots
+		  .filter((slot) => {
+			const slotMinutes = timeToMinutes(slot.time);
+			return slotMinutes >= startMinutes && slotMinutes <= endMinutes;
+		  })
+		  .map((slot) => slot.time);
+	  }
+	});
+  
+	function timeToMinutes(time: string): number {
+	  const [hours, minutes]: number[] = time.split(':').map(Number);
+	  return hours * 60 + minutes;
+	}
+  
 	async function handleSubmit(): Promise<void> {
-		showEventNameError = false;
-		
-		if (!eventName.trim()) {
-			showEventNameError = true;
-			const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-			input?.focus();
-			alert('Please fill in all required fields');
-			return;
-		}
-
-		if (!selectedDates.length || !selectedTimes.length) {
-			alert('Please fill in all required fields');
-			return;
-		}
-
-		const eventData = {
-			id: uuidv4(),
-			name: eventName,
-			dates: selectedDates.map((date: Date) => date.toISOString()),
-			timeSlots: selectedTimes,
-			timeZone: selectedTimeZone
-		};
-
-		try {
-			const response = await fetch('/api/events', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(eventData)
+	  showEventNameError = false;
+  
+	  if (!eventName.trim()) {
+		showEventNameError = true;
+		const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+		input?.focus();
+		alert('Please fill in all required fields');
+		return;
+	  }
+  
+	  if (!selectedDates.length || !selectedTimes.length) {
+		alert('Please fill in all required fields');
+		return;
+	  }
+  
+	  const eventData = {
+		id: uuidv4(),
+		name: eventName,
+		dates: selectedDates.map((date: Date) => date.toISOString()),
+		timeSlots: selectedTimes,
+		timeZone: selectedTimeZone
+	  };
+  
+	  try {
+		const response = await fetch('/api/events', {
+		  method: 'POST',
+		  headers: { 'Content-Type': 'application/json' },
+		  body: JSON.stringify(eventData)
+		});
+		if (!response.ok) throw new Error('Failed to create event');
+		window.location.href = `/events/${eventData.id}`;
+	  } catch (error) {
+		alert('Failed to create event. Please try again.');
+	  }
+	}
+  
+	// ======================
+	// NEW CALENDAR COMPONENT CODE
+	// ======================
+	// This new calendar replaces the old date-fns-based calendar.
+	// It handles its own state for the visible month and selection and updates
+	// the main page’s selectedDates.
+	let currentYear = new Date().getFullYear();
+	let currentMonth = new Date().getMonth(); // 0 = January, etc.
+  
+	// Calendar cell type.
+	interface Cell {
+	  row: number;
+	  col: number;
+	  date: number;
+	  selected: boolean;
+	  active: boolean;
+	  inCurrentMonth: boolean;
+	}
+  
+	// Utility to get the full month name.
+	function getMonthName(year: number, month: number): string {
+	  return new Date(year, month, 1).toLocaleString('default', { month: 'long' });
+	}
+  
+	// Generate the calendar grid (with adjacent month days shown at lower opacity).
+	function generateCalendarGrid(year: number, month: number): Cell[][] {
+	  const firstDay = new Date(year, month, 1).getDay();
+	  const daysInMonth = new Date(year, month + 1, 0).getDate();
+	  const prevMonth = month === 0 ? 11 : month - 1;
+	  const prevYear = month === 0 ? year - 1 : year;
+	  const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
+	  const weeks = Math.ceil((daysInMonth + firstDay) / 7);
+	  const grid: Cell[][] = [];
+	  let currentDate = 1;
+	  let nextDate = 1;
+	  for (let week = 0; week < weeks; week++) {
+		const row: Cell[] = [];
+		for (let col = 0; col < 7; col++) {
+		  const cellIndex = week * 7 + col;
+		  if (cellIndex < firstDay) {
+			// Previous month days (selectable but with lower opacity).
+			const date = daysInPrevMonth - (firstDay - cellIndex - 1);
+			row.push({
+			  row: week + 1,
+			  col: col + 1,
+			  date,
+			  selected: false,
+			  active: true,
+			  inCurrentMonth: false
 			});
-
-			if (!response.ok) throw new Error('Failed to create event');
-			window.location.href = `/events/${eventData.id}`;
-		} catch (error) {
-			alert('Failed to create event. Please try again.');
+		  } else if (currentDate > daysInMonth) {
+			// Next month days.
+			row.push({
+			  row: week + 1,
+			  col: col + 1,
+			  date: nextDate++,
+			  selected: false,
+			  active: true,
+			  inCurrentMonth: false
+			});
+		  } else {
+			// Current month days.
+			row.push({
+			  row: week + 1,
+			  col: col + 1,
+			  date: currentDate++,
+			  selected: false,
+			  active: true,
+			  inCurrentMonth: true
+			});
+		  }
 		}
+		grid.push(row);
+	  }
+	  return grid;
 	}
-
-	let isDragging: boolean = false;
+  
+	let grid: Cell[][] = generateCalendarGrid(currentYear, currentMonth);
+	// Re-generate grid whenever currentYear or currentMonth changes.
+	$: grid = generateCalendarGrid(currentYear, currentMonth);
+  
+	// Drag-selection variables.
+	let isDragging = false;
+	let dragStart: { row: number; col: number } | null = null;
 	let dragMode: 'select' | 'deselect' | null = null;
-	let dragStart: HTMLButtonElement | null = null;
-
-	function handleDragStart(event: MouseEvent): void {
-		const cell = (event.target as HTMLElement).closest('button');
-		if (!cell) return;
-
-		isDragging = true;
-		dragStart = cell as HTMLButtonElement;
-		dragMode = cell.classList.contains('bg-blue-600') ? 'deselect' : 'select';
+	let dragged = false;
+	let dragRange: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null = null;
+	let pendingDragUpdate = false;
+	let startX = 0;
+	let startY = 0;
+	const dragThreshold = 5;
+	const dragThresholdSq = dragThreshold * dragThreshold;
+  
+	function handleMouseDown(cell: Cell, event: MouseEvent) {
+	  isDragging = true;
+	  dragStart = { row: cell.row, col: cell.col };
+	  dragged = false;
+	  dragMode = cell.selected ? 'deselect' : 'select';
+	  dragRange = { minRow: cell.row, maxRow: cell.row, minCol: cell.col, maxCol: cell.col };
+	  startX = event.clientX;
+	  startY = event.clientY;
 	}
-
-	function handleDragMove(event: MouseEvent): void {
-		if (!isDragging) return;
-
-		const cell = (event.target as HTMLElement).closest('button');
-		if (!cell) return;
-
-		clearDragStyling();
-
-		const cells = getCellsInRange(dragStart!, cell as HTMLButtonElement);
-		cells.forEach((cell) => {
-			cell.classList.add(dragMode === 'select' ? 'drag-select' : 'drag-deselect');
-		});
+  
+	function updateDragRange(event: MouseEvent) {
+	  if (!dragStart) return;
+	  const targetElement = (event.target as HTMLElement).closest('.cell');
+	  if (
+		targetElement instanceof HTMLElement &&
+		targetElement.dataset.row &&
+		targetElement.dataset.col
+	  ) {
+		const row = Number(targetElement.dataset.row);
+		const col = Number(targetElement.dataset.col);
+		dragRange = {
+		  minRow: Math.min(dragStart.row, row),
+		  maxRow: Math.max(dragStart.row, row),
+		  minCol: Math.min(dragStart.col, col),
+		  maxCol: Math.max(dragStart.col, col)
+		};
+	  }
 	}
-
-	function handleDragEnd(): void {
-		if (!isDragging) return;
-
-		document.querySelectorAll('.drag-select').forEach((cell) => {
-			cell.classList.add('bg-blue-600', 'text-white');
-
-			const selectedDates = new Set<Date>();
-			selectedDates.add(new Date((cell as HTMLButtonElement).dataset.date!));
+  
+	function handleMouseMove(event: MouseEvent) {
+	  if (!isDragging || !dragStart) return;
+	  const deltaX = event.clientX - startX;
+	  const deltaY = event.clientY - startY;
+	  const distanceSq = deltaX * deltaX + deltaY * deltaY;
+	  if (distanceSq > dragThresholdSq) {
+		dragged = true;
+	  }
+	  if (!pendingDragUpdate) {
+		pendingDragUpdate = true;
+		requestAnimationFrame(() => {
+		  pendingDragUpdate = false;
+		  updateDragRange(event);
 		});
-		document.querySelectorAll('.drag-deselect').forEach((cell) => {
-			cell.classList.remove('bg-blue-600', 'text-white');
-			const selectedDates = new Set<Date>();
-			selectedDates.delete(new Date((cell as HTMLButtonElement).dataset.date!));
-		});
-
-		clearDragStyling();
-		isDragging = false;
-		dragStart = null;
+	  }
 	}
-
-	function clearDragStyling(): void {
-		document.querySelectorAll('.drag-select, .drag-deselect').forEach((cell) => {
-			cell.classList.remove('drag-select', 'drag-deselect');
-		});
-	}
-
-	function getCellsInRange(start: HTMLButtonElement, end: HTMLButtonElement): HTMLButtonElement[] {
-		const cellsInRange: HTMLButtonElement[] = [];
-		const startDate = new Date(start.dataset.date!);
-		const endDate = new Date(end.dataset.date!);
-
-		const minDate = startDate < endDate ? startDate : endDate;
-		const maxDate = startDate > endDate ? startDate : endDate;
-
-		calendarDays.forEach((day) => {
-			const date = new Date(day.date);
-			if (date >= minDate && date <= maxDate) {
-				cellsInRange.push(
-					document.querySelector(`[data-date="${date.toISOString()}"]`) as HTMLButtonElement
-				);
+  
+	function handleMouseUp() {
+	  if (!isDragging || !dragRange) {
+		resetDrag();
+		return;
+	  }
+	  if (dragged) {
+		for (let row of grid) {
+		  for (let cell of row) {
+			if (
+			  cell.row >= dragRange.minRow &&
+			  cell.row <= dragRange.maxRow &&
+			  cell.col >= dragRange.minCol &&
+			  cell.col <= dragRange.maxCol
+			) {
+			  cell.selected = dragMode === 'select';
 			}
-		});
-
-		return cellsInRange;
+		  }
+		}
+		// After a drag selection, update the main page’s selectedDates.
+		updateSelectedDates();
+		grid = grid;
+	  }
+	  resetDrag();
 	}
-</script>
-
-<div class="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+  
+	function resetDrag() {
+	  isDragging = false;
+	  dragStart = null;
+	  dragMode = null;
+	  dragged = false;
+	  dragRange = null;
+	}
+  
+	// Compute the full Date for a given cell.
+	function getFullDate(cell: Cell): Date {
+	  if (cell.inCurrentMonth) {
+		return new Date(currentYear, currentMonth, cell.date);
+	  } else {
+		// If in first row, treat as previous month; else next month.
+		if (cell.row === 1) {
+		  const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+		  const year = currentMonth === 0 ? currentYear - 1 : currentYear;
+		  return new Date(year, prevMonth, cell.date);
+		} else {
+		  const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+		  const year = currentMonth === 11 ? currentYear + 1 : currentYear;
+		  return new Date(year, nextMonth, cell.date);
+		}
+	  }
+	}
+  
+	// When a cell is clicked (and not during a drag), toggle its selection.
+	function toggleCell(cell: Cell) {
+	  if (dragged) return;
+	  for (let row of grid) {
+		for (let c of row) {
+		  if (c.row === cell.row && c.col === cell.col) {
+			c.selected = !c.selected;
+			break;
+		  }
+		}
+	  }
+	  updateSelectedDates();
+	  grid = grid;
+	}
+  
+	// Recompute selectedDates based on grid state.
+	function updateSelectedDates() {
+	  selectedDates = grid
+		.flat()
+		.filter((c) => c.selected)
+		.map(getFullDate);
+	}
+  
+	function prevMonthNav() {
+	  if (currentMonth === 0) {
+		currentYear--;
+		currentMonth = 11;
+	  } else {
+		currentMonth--;
+	  }
+	}
+  
+	function nextMonthNav() {
+	  if (currentMonth === 11) {
+		currentYear++;
+		currentMonth = 0;
+	  } else {
+		currentMonth++;
+	  }
+	}
+  </script>
+  
+  <style>
+	/* NEW CALENDAR STYLES */
+	.calendar-container {
+	  max-width: 350px;
+	  margin: 0 auto;
+	  font-family: sans-serif;
+	}
+	.calendar-header {
+	  display: flex;
+	  justify-content: space-between;
+	  align-items: center;
+	  margin-bottom: 10px;
+	}
+	.nav-button {
+	  background: none;
+	  border: none;
+	  font-size: 1.5rem;
+	  cursor: pointer;
+	}
+	.calendar {
+	  display: grid;
+	  grid-template-columns: repeat(7, 1fr);
+	  gap: 2px;
+	  user-select: none;
+	  padding: 5px;
+	  background-color: #ddd;
+	}
+	.cell {
+	  height: 40px;
+	  display: flex;
+	  align-items: center;
+	  justify-content: center;
+	  background-color: white;
+	  border: 1px solid #ccc;
+	  cursor: pointer;
+	  position: relative;
+	  transition: background-color 0.2s, border 0.2s;
+	}
+	.header {
+	  font-weight: bold;
+	  background-color: #f0f0f0;
+	  cursor: default;
+	}
+	.selected {
+	  background-color: #10b981;
+	  color: white;
+	}
+	.other-month {
+	  opacity: 0.5;
+	}
+	.drag-select,
+	.drag-deselect {
+	  border: none;
+	}
+	.drag-select {
+	  color: white;
+	  background-color: #10b981;
+	}
+	.drag-deselect {
+	  color: black;
+	  background-color: #efe7e7;
+	}
+	.drag-select::after,
+	.drag-deselect::after {
+	  content: '';
+	  position: absolute;
+	  top: -1.5px;
+	  left: -1.5px;
+	  right: -1.5px;
+	  bottom: -1.5px;
+	  z-index: -1;
+	  pointer-events: none;
+	}
+	.drag-select::after {
+	  background-color: #10b981;
+	}
+	.drag-deselect::after {
+	  background-color: white;
+	}
+	.cell:hover {
+	  background-color: #f9f9f9;
+	}
+  </style>
+  
+  <div class="min-h-screen bg-gradient-to-br from-gray-50 to-white">
 	<Header />
-
+  
 	<main class="container mx-auto max-w-6xl px-4 py-5">
-		<div class="mx-auto mb-6 max-w-2xl">
-			<input
-				type="text"
-				placeholder="Enter event name"
-				class="w-full rounded-lg border {showEventNameError ? 'border-red-500' : 'border-gray-300'} bg-white px-6 py-4
-			text-center font-medium text-gray-900 placeholder-gray-400
-			transition-all"
-				bind:value={eventName}
-				oninput={() => showEventNameError = false}
-			/>
-			{#if showEventNameError}
-				<p class="mt-2 text-center text-sm text-red-600">Please enter an event name</p>
-			{/if}
-		</div>
-
-		<div class="flex flex-col justify-center justify-items-center gap-16 md:flex-row">
-			<div class="shadow-xs h-fit rounded-lg border border-gray-200 bg-white p-4 md:w-80">
-				<div class="mb-3 flex items-center justify-between">
-					<button
-						class="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
-						aria-label="Previous Month"
-						onclick={navigationHandlers.previousMonth}
-					>
-						<svg
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-						</svg>
-					</button>
-
-					<h2 class="text-lg font-semibold text-gray-900">
-						{format(currentMonth, 'MMMM yyyy')}
-					</h2>
-
-					<button
-						class="rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
-						aria-label="Next Month"
-						onclick={navigationHandlers.nextMonth}
-					>
-						<svg
-							class="h-5 w-5"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-						</svg>
-					</button>
-				</div>
-
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
-					class="grid grid-cols-7 gap-1"
-					onmousedown={handleDragStart}
-					onmousemove={handleDragMove}
-					onmouseup={handleDragEnd}
-				>
-					{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day}
-						<div class="py-2 text-center text-xs font-medium uppercase text-gray-500">
-							{day}
-						</div>
-					{/each}
-
-					{#each calendarDays as day (day.date.getTime())}
-						<button
-							class="aspect-square rounded-md text-sm font-medium
-				  {!day.isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
-				  {day.isToday ? 'ring-1 ring-blue-500' : ''}
-				  {selectedDatesSet.has(day.date.getTime())
-								? 'bg-blue-600 text-white hover:bg-blue-700'
-								: 'hover:bg-blue-50'}"
-							data-date={day.date}
-							onclick={() => toggleDateSelection(day.date)}
-						>
-							{day.dayLabel}
-						</button>
-					{/each}
-				</div>
+	  <!-- Event Name Input -->
+	  <div class="mx-auto mb-6 max-w-2xl">
+		<input
+		  type="text"
+		  placeholder="Enter event name"
+		  class="w-full rounded-lg border {showEventNameError ? 'border-red-500' : 'border-gray-300'} bg-white px-6 py-4 text-center font-medium text-gray-900 placeholder-gray-400 transition-all"
+		  bind:value={eventName}
+		  on:input={() => (showEventNameError = false)}
+		/>
+		{#if showEventNameError}
+		  <p class="mt-2 text-center text-sm text-red-600">Please enter an event name</p>
+		{/if}
+	  </div>
+  
+	  <div class="flex flex-col justify-center gap-16 md:flex-row">
+		<!-- NEW CALENDAR COMPONENT -->
+		<div class="shadow-xs h-fit rounded-lg border border-gray-200 bg-white p-4 md:w-80">
+		  <div class="calendar-container">
+			<div class="calendar-header">
+			  <button class="nav-button" on:click={prevMonthNav} aria-label="Previous Month">&lt;</button>
+			  <h2>{getMonthName(currentYear, currentMonth)} {currentYear}</h2>
+			  <button class="nav-button" on:click={nextMonthNav} aria-label="Next Month">&gt;</button>
 			</div>
-
-			<div class="shadow-xs w-96 rounded-lg border border-gray-200 bg-white p-6">
-				<div class="mb-6 grid grid-cols-2 gap-4">
-					<div>
-						<label for="startTime" class="mb-2 block text-sm font-medium text-gray-700"
-							>Start Time</label
-						>
-						<select
-							id="startTime"
-							bind:value={startTime}
-							class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
-				  text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-						>
-							{#each timeSlots as timeOption}
-								<option value={timeOption.time}>{timeOption.formatted}</option>
-							{/each}
-						</select>
-					</div>
-					<div>
-						<label for="endTime" class="mb-2 block text-sm font-medium text-gray-700"
-							>End Time</label
-						>
-						<select
-							id="endTime"
-							bind:value={endTime}
-							class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
-				  text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-						>
-							{#each timeSlots as timeOption}
-								<option value={timeOption.time}>{timeOption.formatted}</option>
-							{/each}
-						</select>
-					</div>
-				</div>
-
-				<div class="mb-6">
-					<label for="timezone" class="mb-2 block text-sm font-medium text-gray-700"
-						>Time Zone</label
-					>
-					<select
-						id="timezone"
-						bind:value={selectedTimeZone}
-						class="w-full rounded-md border border-gray-300 bg-white px-3 py-2
-				text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-					>
-						{#each timeZones as tz}
-							<option value={tz.value}>{tz.label}</option>
-						{/each}
-					</select>
-				</div>
-
-				<div class="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
-					{#each timeSlots as timeSlot (timeSlot.time)}
-						<button
-							class="rounded-sm px-3 py-2 text-xs font-medium transition-colors
-				  {selectedTimesSet.has(timeSlot.time)
-								? 'bg-blue-600 text-white hover:bg-blue-700'
-								: 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
-							onclick={() => toggleTimeSelection(timeSlot.time)}
-						>
-							{timeSlot.formatted}
-						</button>
-					{/each}
-				</div>
-			</div>
-		</div>
-
-		<div class="mt-8 text-center">
-			<button
-				onclick={handleSubmit}
-				class="rounded-md bg-blue-600 px-8 py-3 text-sm font-semibold text-white
-			shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline
-			focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600
-			disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
+			<div
+			  class="calendar"
+			  role="grid"
+			  tabindex="0"
+			  aria-label="Calendar Selection Grid"
+			  on:mousemove={handleMouseMove}
+			  on:mouseup={handleMouseUp}
 			>
-				Create Event
-			</button>
+			  <!-- Weekday header row -->
+			  <div class="cell header">S</div>
+			  <div class="cell header">M</div>
+			  <div class="cell header">T</div>
+			  <div class="cell header">W</div>
+			  <div class="cell header">T</div>
+			  <div class="cell header">F</div>
+			  <div class="cell header">S</div>
+			  <!-- Calendar days -->
+			  {#each grid as row}
+				{#each row as cell}
+				  <div
+					class="cell {cell.selected ? 'selected' : ''} {cell.inCurrentMonth ? '' : 'other-month'} {isDragging && dragRange && cell.row >= dragRange.minRow && cell.row <= dragRange.maxRow && cell.col >= dragRange.minCol && cell.col <= dragRange.maxCol ? dragMode === 'select' ? 'drag-select' : 'drag-deselect' : ''}"
+					data-row={cell.row}
+					data-col={cell.col}
+					role="gridcell"
+					tabindex="0"
+					aria-label={`Select ${cell.date}`}
+					on:mousedown={(e) => handleMouseDown(cell, e)}
+					on:click={() => toggleCell(cell)}
+				  >
+					{cell.date}
+				  </div>
+				{/each}
+			  {/each}
+			</div>
+		  </div>
 		</div>
+  
+		<!-- TIME SELECTION PANEL -->
+		<div class="shadow-xs w-96 rounded-lg border border-gray-200 bg-white p-6">
+		  <div class="mb-6 grid grid-cols-2 gap-4">
+			<div>
+			  <label for="startTime" class="mb-2 block text-sm font-medium text-gray-700">Start Time</label>
+			  <select
+				id="startTime"
+				bind:value={startTime}
+				class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+			  >
+				{#each timeSlots as timeOption}
+				  <option value={timeOption.time}>{timeOption.formatted}</option>
+				{/each}
+			  </select>
+			</div>
+			<div>
+			  <label for="endTime" class="mb-2 block text-sm font-medium text-gray-700">End Time</label>
+			  <select
+				id="endTime"
+				bind:value={endTime}
+				class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+			  >
+				{#each timeSlots as timeOption}
+				  <option value={timeOption.time}>{timeOption.formatted}</option>
+				{/each}
+			  </select>
+			</div>
+		  </div>
+  
+		  <div class="mb-6">
+			<label for="timezone" class="mb-2 block text-sm font-medium text-gray-700">Time Zone</label>
+			<select
+			  id="timezone"
+			  bind:value={selectedTimeZone}
+			  class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+			>
+			  {#each timeZones as tz}
+				<option value={tz.value}>{tz.label}</option>
+			  {/each}
+			</select>
+		  </div>
+  
+		  <div class="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
+			{#each timeSlots as timeSlot (timeSlot.time)}
+			  <button
+				class="rounded-sm px-3 py-2 text-xs font-medium transition-colors {selectedTimes.includes(timeSlot.time) ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
+				on:click={() => toggleTimeSelection(timeSlot.time)}
+			  >
+				{timeSlot.formatted}
+			  </button>
+			{/each}
+		  </div>
+		</div>
+	  </div>
+  
+	  <div class="mt-8 text-center">
+		<button
+		  on:click={handleSubmit}
+		  class="rounded-md bg-blue-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+		  disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
+		>
+		  Create Event
+		</button>
+	  </div>
 	</main>
-
+  
 	<Footer />
-</div>
+  </div>
+  
