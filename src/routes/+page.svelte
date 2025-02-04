@@ -1,5 +1,3 @@
-<!-- @migration-task Error while migrating Svelte code: `$:` is not allowed in runes mode, use `$derived` or `$effect` instead
-https://svelte.dev/e/legacy_reactive_statement_invalid -->
 <script lang="ts">
 	import Footer from '$lib/Footer.svelte';
 	import Header from '$lib/Header.svelte';
@@ -119,11 +117,9 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 	// ======================
 	// NEW CALENDAR COMPONENT CODE
 	// ======================
-	// This new calendar replaces the old date-fns-based calendar.
-	// It handles its own state for the visible month and selection and updates
-	// the main page’s selectedDates.
-	let currentYear = new Date().getFullYear();
-	let currentMonth = new Date().getMonth(); // 0 = January, etc.
+	// State for calendar month navigation.
+	let currentYear: number = $state(new Date().getFullYear());
+	let currentMonth: number = $state(new Date().getMonth()); // 0 = January, etc.
   
 	// Calendar cell type.
 	interface Cell {
@@ -156,7 +152,7 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 		for (let col = 0; col < 7; col++) {
 		  const cellIndex = week * 7 + col;
 		  if (cellIndex < firstDay) {
-			// Previous month days (selectable but with lower opacity).
+			// Previous month days (selectable with lower opacity).
 			const date = daysInPrevMonth - (firstDay - cellIndex - 1);
 			row.push({
 			  row: week + 1,
@@ -193,17 +189,19 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 	  return grid;
 	}
   
-	let grid: Cell[][] = generateCalendarGrid(currentYear, currentMonth);
-	// Re-generate grid whenever currentYear or currentMonth changes.
-	$: grid = generateCalendarGrid(currentYear, currentMonth);
+	let grid: Cell[][] = $state(generateCalendarGrid(currentYear, currentMonth));
+	// Update grid when currentYear or currentMonth changes.
+	$effect(() => {
+	  grid = generateCalendarGrid(currentYear, currentMonth);
+	});
   
 	// Drag-selection variables.
-	let isDragging = false;
-	let dragStart: { row: number; col: number } | null = null;
-	let dragMode: 'select' | 'deselect' | null = null;
-	let dragged = false;
-	let dragRange: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null = null;
-	let pendingDragUpdate = false;
+	let isDragging: boolean = $state(false);
+	let dragStart: { row: number; col: number } | null = $state(null);
+	let dragMode: 'select' | 'deselect' | null = $state(null);
+	let dragged: boolean = $state(false);
+	let dragRange: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null = $state(null);
+	let pendingDragUpdate: boolean = $state(false);
 	let startX = 0;
 	let startY = 0;
 	const dragThreshold = 5;
@@ -273,9 +271,9 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 			}
 		  }
 		}
-		// After a drag selection, update the main page’s selectedDates.
 		updateSelectedDates();
-		grid = grid;
+		// Force a new array reference to trigger reactivity.
+		grid = grid.map(row => [...row]);
 	  }
 	  resetDrag();
 	}
@@ -293,15 +291,15 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 	  if (cell.inCurrentMonth) {
 		return new Date(currentYear, currentMonth, cell.date);
 	  } else {
-		// If in first row, treat as previous month; else next month.
+		// If in first row, treat as previous month; otherwise, next month.
 		if (cell.row === 1) {
-		  const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-		  const year = currentMonth === 0 ? currentYear - 1 : currentYear;
-		  return new Date(year, prevMonth, cell.date);
+		  const prevM = currentMonth === 0 ? 11 : currentMonth - 1;
+		  const yr = currentMonth === 0 ? currentYear - 1 : currentYear;
+		  return new Date(yr, prevM, cell.date);
 		} else {
-		  const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
-		  const year = currentMonth === 11 ? currentYear + 1 : currentYear;
-		  return new Date(year, nextMonth, cell.date);
+		  const nextM = currentMonth === 11 ? 0 : currentMonth + 1;
+		  const yr = currentMonth === 11 ? currentYear + 1 : currentYear;
+		  return new Date(yr, nextM, cell.date);
 		}
 	  }
 	}
@@ -318,10 +316,10 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 		}
 	  }
 	  updateSelectedDates();
-	  grid = grid;
+	  grid = grid.map(row => [...row]);
 	}
   
-	// Recompute selectedDates based on grid state.
+	// Update the main page’s selectedDates based on grid state.
 	function updateSelectedDates() {
 	  selectedDates = grid
 		.flat()
@@ -331,19 +329,19 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
   
 	function prevMonthNav() {
 	  if (currentMonth === 0) {
-		currentYear--;
+		currentYear = currentYear - 1;
 		currentMonth = 11;
 	  } else {
-		currentMonth--;
+		currentMonth = currentMonth - 1;
 	  }
 	}
   
 	function nextMonthNav() {
 	  if (currentMonth === 11) {
-		currentYear++;
+		currentYear = currentYear + 1;
 		currentMonth = 0;
 	  } else {
-		currentMonth++;
+		currentMonth = currentMonth + 1;
 	  }
 	}
   </script>
@@ -443,7 +441,7 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 		  placeholder="Enter event name"
 		  class="w-full rounded-lg border {showEventNameError ? 'border-red-500' : 'border-gray-300'} bg-white px-6 py-4 text-center font-medium text-gray-900 placeholder-gray-400 transition-all"
 		  bind:value={eventName}
-		  on:input={() => (showEventNameError = false)}
+		  oninput={() => (showEventNameError = false)}
 		/>
 		{#if showEventNameError}
 		  <p class="mt-2 text-center text-sm text-red-600">Please enter an event name</p>
@@ -455,17 +453,17 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 		<div class="shadow-xs h-fit rounded-lg border border-gray-200 bg-white p-4 md:w-80">
 		  <div class="calendar-container">
 			<div class="calendar-header">
-			  <button class="nav-button" on:click={prevMonthNav} aria-label="Previous Month">&lt;</button>
+			  <button class="nav-button" onclick={prevMonthNav} aria-label="Previous Month">&lt;</button>
 			  <h2>{getMonthName(currentYear, currentMonth)} {currentYear}</h2>
-			  <button class="nav-button" on:click={nextMonthNav} aria-label="Next Month">&gt;</button>
+			  <button class="nav-button" onclick={nextMonthNav} aria-label="Next Month">&gt;</button>
 			</div>
 			<div
 			  class="calendar"
 			  role="grid"
 			  tabindex="0"
 			  aria-label="Calendar Selection Grid"
-			  on:mousemove={handleMouseMove}
-			  on:mouseup={handleMouseUp}
+			  onmousemove={handleMouseMove}
+			  onmouseup={handleMouseUp}
 			>
 			  <!-- Weekday header row -->
 			  <div class="cell header">S</div>
@@ -485,8 +483,8 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 					role="gridcell"
 					tabindex="0"
 					aria-label={`Select ${cell.date}`}
-					on:mousedown={(e) => handleMouseDown(cell, e)}
-					on:click={() => toggleCell(cell)}
+					onmousedown={(e) => handleMouseDown(cell, e)}
+					onclick={() => toggleCell(cell)}
 				  >
 					{cell.date}
 				  </div>
@@ -542,7 +540,7 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
 			{#each timeSlots as timeSlot (timeSlot.time)}
 			  <button
 				class="rounded-sm px-3 py-2 text-xs font-medium transition-colors {selectedTimes.includes(timeSlot.time) ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
-				on:click={() => toggleTimeSelection(timeSlot.time)}
+				onclick={() => toggleTimeSelection(timeSlot.time)}
 			  >
 				{timeSlot.formatted}
 			  </button>
@@ -553,7 +551,7 @@ https://svelte.dev/e/legacy_reactive_statement_invalid -->
   
 	  <div class="mt-8 text-center">
 		<button
-		  on:click={handleSubmit}
+		  onclick={handleSubmit}
 		  class="rounded-md bg-blue-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
 		  disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
 		>
