@@ -1,11 +1,13 @@
 <script lang="ts">
+	// ======================
+	// EVENT & TIME STATE CODE (unchanged)
+	// ======================
 	import Footer from '$lib/Footer.svelte';
 	import Header from '$lib/Header.svelte';
 	import { v4 as uuidv4 } from 'uuid';
+	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 
-	// ======================
-	// EVENT & TIME STATE CODE
-	// ======================
 	// Constants
 	const TIME_INTERVAL: number = 30;
 	const DEFAULT_START_TIME: string = '09:00';
@@ -38,7 +40,9 @@
 		for (let time = 0; time < 24 * 60; time += interval) {
 			const hours: number = Math.floor(time / 60);
 			const minutes: number = time % 60;
-			const timeString: string = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+			const timeString: string = `${hours.toString().padStart(2, '0')}:${minutes
+				.toString()
+				.padStart(2, '0')}`;
 			slots.push({
 				time: timeString,
 				formatted: convertTo12Hour(timeString)
@@ -123,13 +127,10 @@
 	}
 
 	// ======================
-	// NEW CALENDAR COMPONENT CODE
+	// NEW CALENDAR COMPONENT CODE (from your calendar code)
 	// ======================
-	// State for calendar month navigation.
-	let currentYear: number = $state(new Date().getFullYear());
-	let currentMonth: number = $state(new Date().getMonth()); // 0 = January, etc.
 
-	// Calendar cell type.
+	// Define Cell interface
 	interface Cell {
 		row: number;
 		col: number;
@@ -139,12 +140,34 @@
 		inCurrentMonth: boolean;
 	}
 
+	// Calendar state using Svelte 5's $state
+	let { currentYear, currentMonth, grid, isDragging, dragMode, dragRange } = $state({
+		currentYear: new Date().getFullYear(),
+		currentMonth: new Date().getMonth(), // 0 = January, etc.
+		grid: [] as Cell[][],
+		isDragging: false,
+		dragMode: null as 'select' | 'deselect' | null,
+		dragRange: null as { minRow: number; maxRow: number; minCol: number; maxCol: number } | null
+	});
+
+	// Local non-state variables for drag handling.
+	let dragStart: { row: number; col: number } | null = null;
+	let dragged = false;
+	let pendingDragUpdate = false;
+	let startX = 0;
+	let startY = 0;
+	const dragThreshold = 5;
+	const dragThresholdSq = dragThreshold * dragThreshold;
+
+	// Weekday headers
+	const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
 	// Utility to get the full month name.
 	function getMonthName(year: number, month: number): string {
 		return new Date(year, month, 1).toLocaleString('default', { month: 'long' });
 	}
 
-	// Generate the calendar grid (with adjacent month days shown at lower opacity).
+	// Build a grid (2D array) for the current month.
 	function generateCalendarGrid(year: number, month: number): Cell[][] {
 		const firstDay = new Date(year, month, 1).getDay();
 		const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -152,15 +175,16 @@
 		const prevYear = month === 0 ? year - 1 : year;
 		const daysInPrevMonth = new Date(prevYear, prevMonth + 1, 0).getDate();
 		const weeks = Math.ceil((daysInMonth + firstDay) / 7);
-		const grid: Cell[][] = [];
+		const newGrid: Cell[][] = [];
 		let currentDate = 1;
 		let nextDate = 1;
+		
 		for (let week = 0; week < weeks; week++) {
 			const row: Cell[] = [];
 			for (let col = 0; col < 7; col++) {
 				const cellIndex = week * 7 + col;
 				if (cellIndex < firstDay) {
-					// Previous month days (selectable with lower opacity).
+					// Days from previous month.
 					const date = daysInPrevMonth - (firstDay - cellIndex - 1);
 					row.push({
 						row: week + 1,
@@ -171,7 +195,7 @@
 						inCurrentMonth: false
 					});
 				} else if (currentDate > daysInMonth) {
-					// Next month days.
+					// Days from next month.
 					row.push({
 						row: week + 1,
 						col: col + 1,
@@ -181,7 +205,7 @@
 						inCurrentMonth: false
 					});
 				} else {
-					// Current month days.
+					// Days from the current month.
 					row.push({
 						row: week + 1,
 						col: col + 1,
@@ -192,29 +216,38 @@
 					});
 				}
 			}
-			grid.push(row);
+			newGrid.push(row);
 		}
-		return grid;
+		return newGrid;
 	}
 
-	let grid: Cell[][] = $state(generateCalendarGrid(currentYear, currentMonth));
-	// Update grid when currentYear or currentMonth changes.
+	// Regenerate the grid whenever the current month or year changes.
 	$effect(() => {
 		grid = generateCalendarGrid(currentYear, currentMonth);
 	});
 
-	// Drag-selection variables.
-	let isDragging: boolean = $state(false);
-	let dragStart: { row: number; col: number } | null = $state(null);
-	let dragMode: 'select' | 'deselect' | null = $state(null);
-	let dragged: boolean = $state(false);
-	let dragRange: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null =
-		$state(null);
-	let pendingDragUpdate: boolean = $state(false);
-	let startX = 0;
-	let startY = 0;
-	const dragThreshold = 5;
-	const dragThresholdSq = dragThreshold * dragThreshold;
+	// Compute the full Date for a given cell.
+	function getFullDate(cell: Cell): Date {
+		if (cell.inCurrentMonth) {
+			return new Date(currentYear, currentMonth, cell.date);
+		} else {
+			// For cells not in the current month, decide based on the row.
+			if (cell.row === 1) {
+				const prevM = currentMonth === 0 ? 11 : currentMonth - 1;
+				const yr = currentMonth === 0 ? currentYear - 1 : currentYear;
+				return new Date(yr, prevM, cell.date);
+			} else {
+				const nextM = currentMonth === 11 ? 0 : currentMonth + 1;
+				const yr = currentMonth === 11 ? currentYear + 1 : currentYear;
+				return new Date(yr, nextM, cell.date);
+			}
+		}
+	}
+
+	// Update selectedDates based on grid state.
+	function updateSelectedDates() {
+		selectedDates = grid.flat().filter(c => c.selected).map(getFullDate);
+	}
 
 	function handleMouseDown(cell: Cell, event: MouseEvent) {
 		isDragging = true;
@@ -262,31 +295,6 @@
 		}
 	}
 
-	function handleMouseUp() {
-		if (!isDragging || !dragRange) {
-			resetDrag();
-			return;
-		}
-		if (dragged) {
-			for (let row of grid) {
-				for (let cell of row) {
-					if (
-						cell.row >= dragRange.minRow &&
-						cell.row <= dragRange.maxRow &&
-						cell.col >= dragRange.minCol &&
-						cell.col <= dragRange.maxCol
-					) {
-						cell.selected = dragMode === 'select';
-					}
-				}
-			}
-			updateSelectedDates();
-			// Force a new array reference to trigger reactivity.
-			grid = grid.map((row) => [...row]);
-		}
-		resetDrag();
-	}
-
 	function resetDrag() {
 		isDragging = false;
 		dragStart = null;
@@ -295,48 +303,41 @@
 		dragRange = null;
 	}
 
-	// Compute the full Date for a given cell.
-	function getFullDate(cell: Cell): Date {
-		if (cell.inCurrentMonth) {
-			return new Date(currentYear, currentMonth, cell.date);
-		} else {
-			// If in first row, treat as previous month; otherwise, next month.
-			if (cell.row === 1) {
-				const prevM = currentMonth === 0 ? 11 : currentMonth - 1;
-				const yr = currentMonth === 0 ? currentYear - 1 : currentYear;
-				return new Date(yr, prevM, cell.date);
-			} else {
-				const nextM = currentMonth === 11 ? 0 : currentMonth + 1;
-				const yr = currentMonth === 11 ? currentYear + 1 : currentYear;
-				return new Date(yr, nextM, cell.date);
-			}
+	function handleMouseUp() {
+		if (!isDragging || !dragRange) {
+			resetDrag();
+			return;
 		}
+		if (dragged) {
+			// Update grid cells within the drag range.
+			grid = grid.map(row =>
+				row.map(cell =>
+					cell.row >= dragRange!.minRow &&
+					cell.row <= dragRange!.maxRow &&
+					cell.col >= dragRange!.minCol &&
+					cell.col <= dragRange!.maxCol
+						? { ...cell, selected: dragMode === 'select' }
+						: cell
+				)
+			);
+			updateSelectedDates();
+		}
+		resetDrag();
 	}
 
-	// When a cell is clicked (and not during a drag), toggle its selection.
 	function toggleCell(cell: Cell) {
 		if (dragged) return;
-		for (let row of grid) {
-			for (let c of row) {
-				if (c.row === cell.row && c.col === cell.col) {
-					c.selected = !c.selected;
-					break;
-				}
-			}
-		}
+		grid = grid.map(row =>
+			row.map(c =>
+				c.row === cell.row && c.col === cell.col
+					? { ...c, selected: !c.selected }
+					: c
+			)
+		);
 		updateSelectedDates();
-		grid = grid.map((row) => [...row]);
 	}
 
-	// Update the main page’s selectedDates based on grid state.
-	function updateSelectedDates() {
-		selectedDates = grid
-			.flat()
-			.filter((c) => c.selected)
-			.map(getFullDate);
-	}
-
-	function prevMonthNav() {
+	function prevMonth() {
 		if (currentMonth === 0) {
 			currentYear = currentYear - 1;
 			currentMonth = 11;
@@ -345,7 +346,7 @@
 		}
 	}
 
-	function nextMonthNav() {
+	function nextMonth() {
 		if (currentMonth === 11) {
 			currentYear = currentYear + 1;
 			currentMonth = 0;
@@ -353,8 +354,27 @@
 			currentMonth = currentMonth + 1;
 		}
 	}
+
+	// Global mouseup handler in case the user releases outside the calendar.
+	function onWindowMouseUp(event: MouseEvent) {
+		if (isDragging) {
+			handleMouseUp();
+		}
+	}
+
+	onMount(() => {
+		if (browser) {
+			window.addEventListener('mouseup', onWindowMouseUp);
+		}
+	});
+	onDestroy(() => {
+		if (browser) {
+			window.removeEventListener('mouseup', onWindowMouseUp);
+		}
+	});
 </script>
 
+<!-- MAIN MARKUP -->
 <div class="min-h-screen bg-gradient-to-br from-gray-50 to-white">
 	<Header />
 
@@ -376,15 +396,13 @@
 		</div>
 
 		<div class="flex flex-col justify-center gap-16 md:flex-row">
-			<!-- NEW CALENDAR COMPONENT -->
+			<!-- NEW CALENDAR COMPONENT (replaced with calendar code) -->
 			<div class="shadow-xs h-fit rounded-lg border border-gray-200 bg-white p-4 md:w-80">
 				<div class="calendar-container">
 					<div class="calendar-header">
-						<button class="nav-button" onclick={prevMonthNav} aria-label="Previous Month"
-							>&lt;</button
-						>
+						<button class="nav-button" onclick={prevMonth} aria-label="Previous Month">&lt;</button>
 						<h2>{getMonthName(currentYear, currentMonth)} {currentYear}</h2>
-						<button class="nav-button" onclick={nextMonthNav} aria-label="Next Month">&gt;</button>
+						<button class="nav-button" onclick={nextMonth} aria-label="Next Month">&gt;</button>
 					</div>
 					<div
 						class="calendar"
@@ -392,36 +410,21 @@
 						tabindex="0"
 						aria-label="Calendar Selection Grid"
 						onmousemove={handleMouseMove}
-						onmouseup={handleMouseUp}
 					>
 						<!-- Weekday header row -->
-						<div class="cell header">S</div>
-						<div class="cell header">M</div>
-						<div class="cell header">T</div>
-						<div class="cell header">W</div>
-						<div class="cell header">T</div>
-						<div class="cell header">F</div>
-						<div class="cell header">S</div>
-						<!-- Calendar days -->
+						{#each days as day}
+							<div class="cell header">{day}</div>
+						{/each}
+						<!-- Calendar date cells -->
 						{#each grid as row}
 							{#each row as cell}
 								<div
-									class="cell {cell.selected ? 'selected' : ''} {cell.inCurrentMonth
-										? ''
-										: 'other-month'} {isDragging &&
-									dragRange &&
-									cell.row >= dragRange.minRow &&
-									cell.row <= dragRange.maxRow &&
-									cell.col >= dragRange.minCol &&
-									cell.col <= dragRange.maxCol
-										? dragMode === 'select'
-											? 'drag-select'
-											: 'drag-deselect'
-										: ''}"
+									class="cell {cell.selected ? 'selected' : ''} {cell.inCurrentMonth ? '' : 'other-month'} {isDragging && dragRange && cell.row >= dragRange.minRow && cell.row <= dragRange.maxRow && cell.col >= dragRange.minCol && cell.col <= dragRange.maxCol ? dragMode === 'select' ? 'drag-select' : 'drag-deselect' : ''}"
 									data-row={cell.row}
 									data-col={cell.col}
 									role="gridcell"
 									tabindex="0"
+									aria-selected={cell.selected}
 									aria-label={`Select ${cell.date}`}
 									onmousedown={(e) => handleMouseDown(cell, e)}
 									onclick={() => toggleCell(cell)}
@@ -434,7 +437,7 @@
 				</div>
 			</div>
 
-			<!-- TIME SELECTION PANEL -->
+			<!-- TIME SELECTION PANEL (unchanged) -->
 			<div class="shadow-xs w-96 rounded-lg border border-gray-200 bg-white p-6">
 				<div class="mb-6 grid grid-cols-2 gap-4">
 					<div>
@@ -514,7 +517,7 @@
 </div>
 
 <style>
-	/* NEW CALENDAR STYLES */
+	/* CALENDAR STYLES */
 	.calendar-container {
 		max-width: 350px;
 		margin: 0 auto;
@@ -549,9 +552,7 @@
 		border: 1px solid #ccc;
 		cursor: pointer;
 		position: relative;
-		transition:
-			background-color 0.2s,
-			border 0.2s;
+		transition: background-color 0.2s, border 0.2s;
 	}
 	.header {
 		font-weight: bold;
@@ -594,7 +595,6 @@
 	.drag-deselect::after {
 		background-color: white;
 	}
-	/* .cell:hover {
-		background-color: #f9f9f9;
-	} */
+
+	/* (Retained) TIME SELECTION AND GENERAL STYLES */
 </style>
