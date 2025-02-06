@@ -1,34 +1,34 @@
 <script lang="ts">
 	// ========== Type Definitions ==========
 	interface Availability {
-	  [date: string]: {
-		[timeSlot: string]: boolean;
-	  };
+		[date: string]: {
+			[timeSlot: string]: boolean;
+		};
 	}
-  
+
 	interface Participant {
-	  name: string;
-	  timezone: string;
-	  availability: Availability;
-	  lastUpdated: string;
-	  hasPassword?: string; // Store the hashed password
+		name: string;
+		timezone: string;
+		availability: Availability;
+		lastUpdated: string;
+		hasPassword?: string; // Store the hashed password
 	}
-  
+
 	interface Response {
-	  participant_name: string;
-	  date: string;
-	  time_slot: string;
-	  created_at: string;
-	  timezone: string;
+		participant_name: string;
+		date: string;
+		time_slot: string;
+		created_at: string;
+		timezone: string;
 	}
-  
+
 	interface Event {
-	  name: string;
-	  dates: string[];
-	  timeSlots: string[];
-	  responses: Response[];
+		name: string;
+		dates: string[];
+		timeSlots: string[];
+		responses: Response[];
 	}
-  
+
 	// ========== Imports ==========
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
@@ -36,26 +36,26 @@
 	import Footer from '$lib/Footer.svelte';
 	import Header from '$lib/Header.svelte';
 	import { sha256 } from 'js-sha256'; // Import SHA-256 hashing
-  
+
 	// ========== State Management ==========
 	const eventId = page.params.id;
-  
+
 	let event: Event | null = $state(null);
 	let loading = $state(true);
 	let error: string | null = $state(null);
-  
+
 	let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
 	let participantName = $state('');
 	let availability: Availability = $state({});
-  
+
 	let participants: Participant[] = $state([]);
 	let selectedParticipant: Participant | null = $state(null);
-  
+
 	let isDragging = $state(false);
 	let nameError = $state(false);
 	let mouseX = $state(0);
 	let mouseY = $state(0);
-  
+
 	// Add these after the existing state variables
 	let password = $state('');
 	let confirmPassword = $state('');
@@ -64,446 +64,508 @@
 	let isEditing = $state(false);
 	let editingPassword = $state('');
 	let existingParticipantPassword = $state(''); // Store existing password hash
-  
+	let isLoggedIn = $state(false); // Track login status
+	let loginPassword = $state(''); // Password for login
+	let loginError = $state(''); // Error message for login
+	let isNewUser = $state(false); // Track if the user is new
+
 	let dragSelection = $state<{
-	  start: { date: string; timeSlot: string } | null;
-	  end: { date: string; timeSlot: string } | null;
+		start: { date: string; timeSlot: string } | null;
+		end: { date: string; timeSlot: string } | null;
 	}>({ start: null, end: null });
-  
+
 	// This hoveredCell will only be set by the group availability grid cells.
 	let hoveredCell = $state<{ date: string; timeSlot: string } | null>(null);
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = $state(null);
-  
+
 	// ========== Constants ==========
 	const timezones = Intl.supportedValuesOf('timeZone');
-  
+
 	// ========== Event Handlers ==========
 	function handleCellClick(date: string, timeSlot: string) {
-	  const currentState = availability[date]?.[timeSlot] || false;
-	  availability[date] = availability[date] || {}; // Ensure date exists
-	  availability[date][timeSlot] = !currentState;
-	  saveAvailability();
-	}
-  
-	function handleDrag(date: string, timeSlot: string) {
-	  if (!isDragging || !participantName) return;
-	  dragSelection.end = { date, timeSlot };
-	}
-  
-	function stopDrag() {
-	  if (isDragging) {
-		isDragging = false;
-		updateDragSelection();
-		window.removeEventListener('mouseup', globalStopDrag);
-	  }
-	}
-  
-	function globalStopDrag() {
-	  stopDrag();
-	}
-  
-	function startDrag(date: string, timeSlot: string) {
-	  if (!participantName) {
-		nameError = true;
-		const nameInput = document.getElementById('participantName');
-		nameInput?.focus();
-		return;
-	  }
-  
-	  if (!isMobileDevice()) {
-		isDragging = true;
-		dragSelection.start = { date, timeSlot };
-		dragSelection.end = { date, timeSlot };
-		window.addEventListener('mouseup', globalStopDrag);
-	  }
-	}
-  
-	function handleTouchStart(e: TouchEvent, date: string, timeSlot: string) {
-	  if (!participantName) {
-		nameError = true;
-		const nameInput = document.getElementById('participantName');
-		nameInput?.focus();
-		return;
-	  }
-  
-	  const touch = e.touches[0];
-	  initialTouchX = touch.clientX;
-	  initialTouchY = touch.clientY;
-	}
-  
-	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
-	  const touch = e.touches[0];
-	  const deltaX = Math.abs(touch.clientX - initialTouchX);
-	  const deltaY = Math.abs(touch.clientY - initialTouchY);
-  
-	  if (deltaX > touchMoveThreshold || deltaY > touchMoveThreshold) return;
-	  if (!isDragging) return;
-  
-	  const target = document.elementFromPoint(touch.clientX, touch.clientY);
-	  if (target?.closest('button')) {
-		handleDrag(date, timeSlot);
-	  }
-	}
-  
-	function handleTouchEnd(e: TouchEvent, date: string, timeSlot: string) {
-	  const touch = e.changedTouches[0];
-	  const deltaX = Math.abs(touch.clientX - initialTouchX);
-	  const deltaY = Math.abs(touch.clientY - initialTouchY);
-  
-	  if (deltaX <= touchMoveThreshold && deltaY <= touchMoveThreshold) {
+		if (!isLoggedIn) {
+			alert('Please sign in to select availability.');
+			return;
+		}
 		const currentState = availability[date]?.[timeSlot] || false;
 		availability[date] = availability[date] || {}; // Ensure date exists
 		availability[date][timeSlot] = !currentState;
 		saveAvailability();
-	  }
-	  stopDrag();
 	}
-  
+
+	function handleDrag(date: string, timeSlot: string) {
+		if (!isLoggedIn) {
+			return;
+		}
+		if (!isDragging || !participantName) return;
+		dragSelection.end = { date, timeSlot };
+	}
+
+	function stopDrag() {
+		if (isDragging) {
+			isDragging = false;
+			updateDragSelection();
+			window.removeEventListener('mouseup', globalStopDrag);
+		}
+	}
+
+	function globalStopDrag() {
+		stopDrag();
+	}
+
+	function startDrag(date: string, timeSlot: string) {
+		if (!isLoggedIn) {
+			return;
+		}
+		if (!participantName) {
+			nameError = true;
+			const nameInput = document.getElementById('participantName');
+			nameInput?.focus();
+			return;
+		}
+
+		if (!isMobileDevice()) {
+			isDragging = true;
+			dragSelection.start = { date, timeSlot };
+			dragSelection.end = { date, timeSlot };
+			window.addEventListener('mouseup', globalStopDrag);
+		}
+	}
+
+	function handleTouchStart(e: TouchEvent, date: string, timeSlot: string) {
+		if (!isLoggedIn) {
+			return;
+		}
+		if (!participantName) {
+			nameError = true;
+			const nameInput = document.getElementById('participantName');
+			nameInput?.focus();
+			return;
+		}
+
+		const touch = e.touches[0];
+		initialTouchX = touch.clientX;
+		initialTouchY = touch.clientY;
+	}
+
+	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
+		const touch = e.touches[0];
+		const deltaX = Math.abs(touch.clientX - initialTouchX);
+		const deltaY = Math.abs(touch.clientY - initialTouchY);
+
+		if (deltaX > touchMoveThreshold || deltaY > touchMoveThreshold) return;
+		if (!isDragging) return;
+
+		const target = document.elementFromPoint(touch.clientX, touch.clientY);
+		if (target?.closest('button')) {
+			handleDrag(date, timeSlot);
+		}
+	}
+
+	function handleTouchEnd(e: TouchEvent, date: string, timeSlot: string) {
+		const touch = e.changedTouches[0];
+		const deltaX = Math.abs(touch.clientX - initialTouchX);
+		const deltaY = Math.abs(touch.clientY - initialTouchY);
+
+		if (deltaX <= touchMoveThreshold && deltaY <= touchMoveThreshold) {
+			const currentState = availability[date]?.[timeSlot] || false;
+			availability[date] = availability[date] || {}; // Ensure date exists
+			availability[date][timeSlot] = !currentState;
+			saveAvailability();
+		}
+		stopDrag();
+	}
+
 	function viewParticipantAvailability(participant: Participant): void {
-	  selectedParticipant = participant;
+		selectedParticipant = participant;
 	}
-  
+
 	// ========== Utility Functions ==========
 	function trackMousePosition(event: MouseEvent) {
-	  mouseX = event.clientX;
-	  mouseY = event.clientY;
+		mouseX = event.clientX;
+		mouseY = event.clientY;
 	}
-  
+
 	function isMobileDevice(): boolean {
-	  return /Mobi|Android/i.test(navigator.userAgent);
+		return /Mobi|Android/i.test(navigator.userAgent);
 	}
-  
+
 	function formatDate(dateStr: string): string {
-	  return format(new Date(dateStr), 'MMM d\nEEE');
+		return format(new Date(dateStr), 'MMM d\nEEE');
 	}
-  
+
 	function formatDateTime(dateStr: string): string {
-	  return new Date(dateStr).toLocaleString();
+		return new Date(dateStr).toLocaleString();
 	}
-  
+
 	// These functions are used only for the group availability grid.
 	function handleCellHover(date: string, timeSlot: string) {
-	  if (hoverTimeout) clearTimeout(hoverTimeout);
-	  hoverTimeout = setTimeout(() => (hoveredCell = { date, timeSlot }), 200);
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoverTimeout = setTimeout(() => (hoveredCell = { date, timeSlot }), 200);
 	}
-  
+
 	function handleCellLeave() {
-	  if (hoverTimeout) clearTimeout(hoverTimeout);
-	  hoverTimeout = null;
-	  hoveredCell = null;
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoverTimeout = null;
+		hoveredCell = null;
 	}
-  
+
 	// ========== Business Logic ==========
 	function updateDragSelection() {
-	  if (!dragSelection.start || !dragSelection.end || !event) return;
-  
-	  const dates = event.dates;
-	  const timeSlots = event.timeSlots;
-	  const startDateIdx = dates.indexOf(dragSelection.start.date);
-	  const endDateIdx = dates.indexOf(dragSelection.end.date);
-	  const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
-	  const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
-  
-	  const [minDateIdx, maxDateIdx] = [
-		Math.min(startDateIdx, endDateIdx),
-		Math.max(startDateIdx, endDateIdx),
-	  ];
-	  const [minTimeIdx, maxTimeIdx] = [
-		Math.min(startTimeIdx, endTimeIdx),
-		Math.max(startTimeIdx, endTimeIdx),
-	  ];
-  
-	  const currentState =
-		availability[dragSelection.start.date]?.[dragSelection.start.timeSlot] ||
-		false;
-  
-	  for (let d = minDateIdx; d <= maxDateIdx; d++) {
-		for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
-		  const date = dates[d];
-		  const timeSlot = timeSlots[t];
-		  availability[date] = availability[date] || {}; // Ensure date exists
-		  availability[date][timeSlot] = !currentState;
+		if (!dragSelection.start || !dragSelection.end || !event) return;
+
+		const dates = event.dates;
+		const timeSlots = event.timeSlots;
+		const startDateIdx = dates.indexOf(dragSelection.start.date);
+		const endDateIdx = dates.indexOf(dragSelection.end.date);
+		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
+		const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
+
+		const [minDateIdx, maxDateIdx] = [
+			Math.min(startDateIdx, endDateIdx),
+			Math.max(startDateIdx, endDateIdx)
+		];
+		const [minTimeIdx, maxTimeIdx] = [
+			Math.min(startTimeIdx, endTimeIdx),
+			Math.max(startTimeIdx, endTimeIdx)
+		];
+
+		const currentState =
+			availability[dragSelection.start.date]?.[dragSelection.start.timeSlot] || false;
+
+		for (let d = minDateIdx; d <= maxDateIdx; d++) {
+			for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
+				const date = dates[d];
+				const timeSlot = timeSlots[t];
+				availability[date] = availability[date] || {}; // Ensure date exists
+				availability[date][timeSlot] = !currentState;
+			}
 		}
-	  }
-  
-	  saveAvailability();
-	  dragSelection.start = null;
-	  dragSelection.end = null;
+
+		saveAvailability();
+		dragSelection.start = null;
+		dragSelection.end = null;
 	}
-  
+
 	function getGroupAvailability(date: string, timeSlot: string): number {
-	  if (!event?.responses) return 0;
-  
-	  const uniqueParticipants = new Set(event.responses.map((r) => r.participant_name));
-	  const responsesForSlot = event.responses.filter(
-		(r) => r.date === date && r.time_slot === timeSlot
-	  );
-  
-	  return (responsesForSlot.length / (uniqueParticipants.size || 1)) * 100;
+		if (!event?.responses) return 0;
+
+		const uniqueParticipants = new Set(event.responses.map((r) => r.participant_name));
+		const responsesForSlot = event.responses.filter(
+			(r) => r.date === date && r.time_slot === timeSlot
+		);
+
+		return (responsesForSlot.length / (uniqueParticipants.size || 1)) * 100;
 	}
-  
+
 	function getParticipantsForSlot(
-	  date: string,
-	  timeSlot: string
+		date: string,
+		timeSlot: string
 	): { available: string[]; unavailable: string[] } {
-	  if (!event?.responses) return { available: [], unavailable: [] };
-  
-	  const available = new Set<string>();
-	  const allParticipants = new Set<string>();
-  
-	  event.responses.forEach((response) => {
-		allParticipants.add(response.participant_name);
-		if (response.date === date && response.time_slot === timeSlot) {
-		  available.add(response.participant_name);
-		}
-	  });
-  
-	  const unavailable = Array.from(allParticipants).filter(
-		(participant) => !available.has(participant)
-	  );
-  
-	  return {
-		available: Array.from(available),
-		unavailable,
-	  };
+		if (!event?.responses) return { available: [], unavailable: [] };
+
+		const available = new Set<string>();
+		const allParticipants = new Set<string>();
+
+		event.responses.forEach((response) => {
+			allParticipants.add(response.participant_name);
+			if (response.date === date && response.time_slot === timeSlot) {
+				available.add(response.participant_name);
+			}
+		});
+
+		const unavailable = Array.from(allParticipants).filter(
+			(participant) => !available.has(participant)
+		);
+
+		return {
+			available: Array.from(available),
+			unavailable
+		};
 	}
-  
+
 	function getParticipantAvailability(
-	  participant: Participant | null,
-	  date: string,
-	  timeSlot: string
+		participant: Participant | null,
+		date: string,
+		timeSlot: string
 	): boolean {
-	  return participant?.availability?.[date]?.[timeSlot] || false;
+		return participant?.availability?.[date]?.[timeSlot] || false;
 	}
-  
+
 	function isInDragSelection(date: string, timeSlot: string): boolean {
-	  if (!dragSelection.start || !dragSelection.end || !event) return false;
-  
-	  const dates = event.dates;
-	  const timeSlots = event.timeSlots;
-	  const currentDateIdx = dates.indexOf(date);
-	  const currentTimeIdx = timeSlots.indexOf(timeSlot);
-  
-	  const startDateIdx = dates.indexOf(dragSelection.start.date);
-	  const endDateIdx = dates.indexOf(dragSelection.end.date);
-	  const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
-	  const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
-  
-	  return (
-		currentDateIdx >= Math.min(startDateIdx, endDateIdx) &&
-		currentDateIdx <= Math.max(startDateIdx, endDateIdx) &&
-		currentTimeIdx >= Math.min(startTimeIdx, endTimeIdx) &&
-		currentTimeIdx <= Math.max(startTimeIdx, endTimeIdx)
-	  );
+		if (!dragSelection.start || !dragSelection.end || !event) return false;
+
+		const dates = event.dates;
+		const timeSlots = event.timeSlots;
+		const currentDateIdx = dates.indexOf(date);
+		const currentTimeIdx = timeSlots.indexOf(timeSlot);
+
+		const startDateIdx = dates.indexOf(dragSelection.start.date);
+		const endDateIdx = dates.indexOf(dragSelection.end.date);
+		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
+		const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
+
+		return (
+			currentDateIdx >= Math.min(startDateIdx, endDateIdx) &&
+			currentDateIdx <= Math.max(startDateIdx, endDateIdx) &&
+			currentTimeIdx >= Math.min(startTimeIdx, endTimeIdx) &&
+			currentTimeIdx <= Math.max(startTimeIdx, endTimeIdx)
+		);
 	}
-  
+
 	// ========== API Interactions ==========
 	async function saveAvailability() {
-	  if (!participantName) {
-		nameError = true;
-		return;
-	  }
-  
-	  // Password validation
-	  let hashedPassword = '';
-	  if (showPasswordFields) {
-		if (isEditing && !editingPassword) {
-		  passwordError = 'Password is required to edit this entry';
-		  return;
-		}
-		if (!isEditing && (!password || !confirmPassword)) {
-		  passwordError = 'Please fill in both password fields';
-		  return;
-		}
-		if (!isEditing && password !== confirmPassword) {
-		  passwordError = "Passwords don't match";
-		  return;
-		}
-		if (!isEditing && password.length < 6) {
-		  passwordError = 'Password must be at least 6 characters';
-		  return;
-		}
-  
-		// Hash the password
-		hashedPassword = sha256(isEditing ? editingPassword : password);
-  
-		if (isEditing && hashedPassword !== existingParticipantPassword) {
-		  passwordError = 'Incorrect password';
-		  return;
-		}
-	  }
-  
-	  try {
-		const response = await fetch(`/api/events/${eventId}/responses`, {
-		  method: 'POST',
-		  headers: { 'Content-Type': 'application/json' },
-		  body: JSON.stringify({
-			participantName,
-			availability,
-			timezone,
-			password: showPasswordFields ? hashedPassword : undefined, // Send hashed password
-		  }),
-		});
-  
-		if (!response.ok) {
-		  const error = await response.json();
-		  if (error.type === 'password_required') {
-			passwordError = 'Incorrect password';
+		if (!isLoggedIn) {
+			alert('Please sign in to save availability.');
 			return;
-		  }
-		  throw new Error('Failed to save availability');
 		}
-  
-		showSuccessFeedback();
-		await refreshEventData();
-  
-		// Reset password fields after successful save
-		if (!isEditing) {
-		  password = '';
-		  confirmPassword = '';
-		  showPasswordFields = false;
+		if (!participantName) {
+			nameError = true;
+			return;
 		}
-		passwordError = '';
-	  } catch (error: unknown) {
-		handleSaveError(error);
-	  }
+
+		// Password validation
+		let hashedPassword = '';
+		if (showPasswordFields) {
+			if (isNewUser && (!password || !confirmPassword)) {
+				passwordError = 'Please fill in both password fields';
+				return;
+			}
+			if (isNewUser && password !== confirmPassword) {
+				passwordError = "Passwords don't match";
+				return;
+			}
+			if (isNewUser && password.length < 6) {
+				passwordError = 'Password must be at least 6 characters';
+				return;
+			}
+			if (isEditing && !editingPassword) {
+				passwordError = 'Password is required to edit this entry';
+				return;
+			}
+
+			// Hash the password
+			hashedPassword = sha256(isNewUser ? password : editingPassword);
+
+			if (isEditing && hashedPassword !== existingParticipantPassword) {
+				passwordError = 'Incorrect password';
+				return;
+			}
+		}
+
+		try {
+			const response = await fetch(`/api/events/${eventId}/responses`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					participantName,
+					availability,
+					timezone,
+					password: showPasswordFields ? hashedPassword : undefined // Send hashed password
+				})
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				if (error.type === 'password_required') {
+					passwordError = 'Incorrect password';
+					return;
+				}
+				throw new Error('Failed to save availability');
+			}
+
+			showSuccessFeedback();
+			await refreshEventData();
+
+			// Reset password fields after successful save
+			if (!isEditing) {
+				password = '';
+				confirmPassword = '';
+				showPasswordFields = false;
+			}
+			passwordError = '';
+		} catch (error: unknown) {
+			handleSaveError(error);
+		}
 	}
-  
+
 	// ========== UI Helpers ==========
 	function showSuccessFeedback() {
-	  const successMessage = document.createElement('div');
-	  successMessage.className =
-		'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
-	  successMessage.textContent = 'Availability saved successfully!';
-	  document.body.appendChild(successMessage);
-	  setTimeout(() => successMessage.remove(), 3000);
+		const successMessage = document.createElement('div');
+		successMessage.className =
+			'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
+		successMessage.textContent = 'Availability saved successfully!';
+		document.body.appendChild(successMessage);
+		setTimeout(() => successMessage.remove(), 3000);
 	}
-  
+
 	// ========== Data Management ==========
 	async function refreshEventData() {
-	  const eventResponse = await fetch(`/api/events/${eventId}`);
-	  if (eventResponse.ok) {
-		event = (await eventResponse.json()) as Event;
-		updateParticipants();
-	  }
+		const eventResponse = await fetch(`/api/events/${eventId}`);
+		if (eventResponse.ok) {
+			event = (await eventResponse.json()) as Event;
+			updateParticipants();
+		}
 	}
-  
+
 	function updateParticipants() {
-	  if (!event?.responses) return;
-  
-	  const participantMap = new Map<string, Participant>();
-	  event.responses.forEach((response) => {
-		const existingParticipant = participantMap.get(response.participant_name);
-  
-		const participant: Participant = existingParticipant ?? {
-		  name: response.participant_name,
-		  timezone: response.timezone,
-		  availability: {},
-		  lastUpdated: response.created_at,
-		};
-  
-		participant.availability[response.date] =
-		  participant.availability[response.date] || {};
-		participant.availability[response.date][response.time_slot] = true;
-		participantMap.set(response.participant_name, participant);
-	  });
-  
-	  participants = Array.from(participantMap.values()).sort(
-		(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
-	  );
+		if (!event?.responses) return;
+
+		const participantMap = new Map<string, Participant>();
+		event.responses.forEach((response) => {
+			const existingParticipant = participantMap.get(response.participant_name);
+
+			const participant: Participant = existingParticipant ?? {
+				name: response.participant_name,
+				timezone: response.timezone,
+				availability: {},
+				lastUpdated: response.created_at
+			};
+
+			participant.availability[response.date] = participant.availability[response.date] || {};
+			participant.availability[response.date][response.time_slot] = true;
+			participantMap.set(response.participant_name, participant);
+		});
+
+		participants = Array.from(participantMap.values()).sort(
+			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+		);
 	}
-  
+
 	// ========== Error Handling ==========
 	function handleSaveError(error: unknown) {
-	  const message =
-		error instanceof Error ? error.message : 'Failed to save your availability';
-	  alert(message);
+		const message = error instanceof Error ? error.message : 'Failed to save your availability';
+		alert(message);
 	}
-  
+
 	// ========== Lifecycle Hooks ==========
 	onMount(async () => {
-	  // Reset password-related state
-	  isEditing = false;
-	  showPasswordFields = false;
-	  password = '';
-	  confirmPassword = '';
-	  editingPassword = '';
-	  passwordError = '';
-	  existingParticipantPassword = '';
-  
-	  try {
-		const response = await fetch(`/api/events/${eventId}`);
-		if (!response.ok) throw new Error('Event not found');
-  
-		event = (await response.json()) as Event;
-		initializeAvailability();
-		initializeParticipants();
-	  } catch (e) {
-		error = e instanceof Error ? e.message : 'Failed to load event';
-	  } finally {
-		loading = false;
-	  }
-	});
-  
-	function initializeAvailability() {
-	  event?.dates.forEach((date) => {
-		availability[date] = {};
-		event?.timeSlots.forEach((timeSlot) => {
-		  availability[date][timeSlot] = false;
-		});
-	  });
-	}
-  
-	function initializeParticipants() {
-	  if (!event?.responses) return;
-  
-	  const participantMap = new Map<string, Participant>();
-	  event.responses.forEach((response) => {
-		const existingParticipant = participantMap.get(response.participant_name);
-  
-		const participant: Participant = existingParticipant ?? {
-		  name: response.participant_name,
-		  timezone: response.timezone,
-		  availability: {},
-		  lastUpdated: response.created_at,
-		};
-  
-		participant.availability[response.date] =
-		  participant.availability[response.date] || {};
-		participant.availability[response.date][response.time_slot] = true;
-		participantMap.set(response.participant_name, participant);
-	  });
-  
-	  participants = Array.from(participantMap.values()).sort(
-		(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
-	  );
-	}
-  
-	async function handleNameInput() {
-	  nameError = false;
-	  if (!participantName) return;
-  
-	  const existingParticipant = participants.find((p) => p.name === participantName);
-	  if (existingParticipant) {
-		isEditing = true;
-		showPasswordFields = true;
-		passwordError = '';
-		existingParticipantPassword = existingParticipant.hasPassword || ''; // Store existing password
-	  } else {
+		// Reset password-related state
 		isEditing = false;
 		showPasswordFields = false;
 		password = '';
 		confirmPassword = '';
+		editingPassword = '';
+		passwordError = '';
 		existingParticipantPassword = '';
-	  }
+
+		try {
+			const response = await fetch(`/api/events/${eventId}`);
+			if (!response.ok) throw new Error('Event not found');
+
+			event = (await response.json()) as Event;
+			initializeAvailability();
+			initializeParticipants();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load event';
+		} finally {
+			loading = false;
+		}
+	});
+
+	function initializeAvailability() {
+		event?.dates.forEach((date) => {
+			availability[date] = {};
+			event?.timeSlots.forEach((timeSlot) => {
+				availability[date][timeSlot] = false;
+			});
+		});
 	}
-  
+
+	function initializeParticipants() {
+		if (!event?.responses) return;
+
+		const participantMap = new Map<string, Participant>();
+		event.responses.forEach((response) => {
+			const existingParticipant = participantMap.get(response.participant_name);
+
+			const participant: Participant = existingParticipant ?? {
+				name: response.participant_name,
+				timezone: response.timezone,
+				availability: {},
+				lastUpdated: response.created_at
+			};
+
+			participant.availability[response.date] = participant.availability[response.date] || {};
+			participant.availability[response.date][response.time_slot] = true;
+			participantMap.set(response.participant_name, participant);
+		});
+
+		participants = Array.from(participantMap.values()).sort(
+			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+		);
+	}
+
+	async function handleNameInput() {
+		nameError = false;
+		if (!participantName) return;
+
+		const existingParticipant = participants.find((p) => p.name === participantName);
+		if (existingParticipant) {
+			isNewUser = false;
+			isEditing = true;
+			showPasswordFields = true;
+			passwordError = '';
+			existingParticipantPassword = existingParticipant.hasPassword || ''; // Store existing password
+		} else {
+			isNewUser = true;
+			isEditing = false;
+			showPasswordFields = false;
+			password = '';
+			confirmPassword = '';
+			existingParticipantPassword = '';
+		}
+	}
+
+	async function handleSignIn() {
+		nameError = false;
+		loginError = '';
+
+		if (!participantName) {
+			nameError = true;
+			return;
+		}
+
+		const existingParticipant = participants.find((p) => p.name === participantName);
+
+		if (existingParticipant) {
+			isNewUser = false;
+			if (existingParticipant.hasPassword) {
+				// Verify password
+				const hashedPassword = sha256(loginPassword);
+				if (hashedPassword === existingParticipant.hasPassword) {
+					isLoggedIn = true;
+				} else {
+					loginError = 'Incorrect password';
+				}
+			} else {
+				// No password required
+				isLoggedIn = true;
+			}
+		} else {
+			// New user, no password needed for sign-in
+			isNewUser = true;
+			isLoggedIn = true;
+			showPasswordFields = true; // Show password fields for new user
+		}
+	}
+
+	function handleSignOut() {
+		isLoggedIn = false;
+		participantName = '';
+		password = '';
+		confirmPassword = '';
+		loginPassword = '';
+		showPasswordFields = false;
+		availability = {};
+		initializeAvailability();
+	}
+
 	// ========== Drag Constants ==========
 	let initialTouchX = 0;
 	let initialTouchY = 0;
 	const touchMoveThreshold = 10;
-  </script>
-
+</script>
 
 <div
   class="flex min-h-screen flex-col bg-white"
@@ -545,111 +607,131 @@
           <div class="flex flex-col gap-8 lg:flex-row">
             <!-- Left Sidebar -->
             <div class="w-full space-y-8 lg:w-1/4">
-              <!-- User Info Section -->
+              <!-- User Info / Sign-in Section -->
               <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-                <h2 class="mb-4 text-lg font-semibold text-gray-900">Your Information</h2>
-                <div class="space-y-4">
-                  <div>
-                    <label
-                      for="participantName"
-                      class="mb-1 block text-sm font-medium text-gray-700"
-                    >
-                      Name {#if nameError}<span class="text-red-500">*</span>{/if}
-                    </label>
-                    <input
-                      type="text"
-                      id="participantName"
-                      bind:value={participantName}
-                      class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      class:border-red-500={nameError}
-                      class:border-gray-300={!nameError}
-                      placeholder="Your name"
-                      oninput={() => {
-                        nameError = false;
-                        handleNameInput();
-                      }}
-                    />
-                    {#if nameError}
-                      <p class="mt-1 text-sm text-red-600">
-                        Please enter your name before selecting availability
-                      </p>
-                    {/if}
-                  </div>
-                  <!-- Add this after the name input field in the User Info Section -->
-                  {#if !isEditing}
-                    <div class="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="enablePassword"
-                        bind:checked={showPasswordFields}
-                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <label for="enablePassword" class="text-sm text-gray-600">
-                        Protect my availability with a password
+                <h2 class="mb-4 text-lg font-semibold text-gray-900">
+                  {isLoggedIn ? 'Your Information' : 'Sign In'}
+                </h2>
+
+                {#if !isLoggedIn}
+                  <!-- Sign-in Form -->
+                  <div class="space-y-4">
+                    <div>
+                      <label
+                        for="participantName"
+                        class="mb-1 block text-sm font-medium text-gray-700"
+                      >
+                        Name {#if nameError}<span class="text-red-500">*</span>{/if}
                       </label>
+                      <input
+                        type="text"
+                        id="participantName"
+                        bind:value={participantName}
+                        class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class:border-red-500={nameError}
+                        class:border-gray-300={!nameError}
+                        placeholder="Your name"
+                        oninput={() => {
+                          nameError = false;
+                          handleNameInput();
+                        }}
+                      />
+                      {#if nameError}
+                        <p class="mt-1 text-sm text-red-600">Please enter your name.</p>
+                      {/if}
                     </div>
-                  {/if}
 
-                  {#if showPasswordFields}
-                    <div class="space-y-3">
-                      <div>
-                        <label for="password" class="mb-1 block text-sm font-medium text-gray-700">
-                          {isEditing ? 'Enter Password' : 'Create Password'}
-                        </label>
-                        <input
-                          type="password"
-                          id="password"
-                          value={isEditing ? editingPassword : password}
-                          class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          placeholder={isEditing ? 'Enter your password' : 'Create a password'}
-                          oninput={(e) => {
-                            const target = e.target as HTMLInputElement;
-                            if (isEditing) {
-                              editingPassword = target?.value ?? '';
-                            } else {
-                              password = target?.value ?? '';
-                            }
-                          }}
-                        />
-                      </div>
-
-                      {#if !isEditing}
+                    {#if showPasswordFields}
+                      <div class="space-y-3">
                         <div>
                           <label
-                            for="confirmPassword"
+                            for="loginPassword"
                             class="mb-1 block text-sm font-medium text-gray-700"
                           >
-                            Confirm Password
+                            Password
                           </label>
                           <input
                             type="password"
-                            id="confirmPassword"
-                            bind:value={confirmPassword}
+                            id="loginPassword"
+                            bind:value={loginPassword}
                             class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                            placeholder="Confirm your password"
+                            placeholder="Enter your password"
                           />
                         </div>
-                      {/if}
+                        {#if isNewUser}
+                          <div>
+                            <label
+                              for="password"
+                              class="mb-1 block text-sm font-medium text-gray-700"
+                            >
+                              Create Password
+                            </label>
+                            <input
+                              type="password"
+                              id="password"
+                              bind:value={password}
+                              class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              placeholder="Create a password"
+                            />
+                          </div>
+                          <div>
+                            <label
+                              for="confirmPassword"
+                              class="mb-1 block text-sm font-medium text-gray-700"
+                            >
+                              Confirm Password
+                            </label>
+                            <input
+                              type="password"
+                              id="confirmPassword"
+                              bind:value={confirmPassword}
+                              class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                              placeholder="Confirm your password"
+                            />
+                          </div>
+                          {#if passwordError}
+                            <p class="text-sm text-red-600">{passwordError}</p>
+                          {/if}
+                        {/if}
+                      </div>
+                    {/if}
 
-                      {#if passwordError}
-                        <p class="text-sm text-red-600">
-                          {passwordError}
-                        </p>
-                      {/if}
-                    </div>
-                  {/if}
-                  <div>
-                    <label class="mb-1 block text-sm font-medium text-gray-700">Time Zone</label>
-                    <select
-                      bind:value={timezone}
-                      class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    {#if loginError}
+                      <p class="text-sm text-red-600">{loginError}</p>
+                    {/if}
+
+                    <button
+                      class="w-full rounded bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onclick={handleSignIn}
                     >
-                      {#each timezones as tz}
-                        <option value={tz}>{tz.replace(/_/g, ' ')}</option>
-                      {/each}
-                    </select>
+                      Sign In
+                    </button>
                   </div>
-                </div>
+                {:else}
+                  <!-- User Information Display -->
+                  <div class="space-y-4">
+                    <p class="text-sm text-gray-700">
+                      Signed in as: <span class="font-medium">{participantName}</span>
+                    </p>
+                    <div>
+                      <label class="mb-1 block text-sm font-medium text-gray-700">Time Zone</label>
+                      <select
+                        bind:value={timezone}
+                        class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      >
+                        {#each timezones as tz}
+                          <option value={tz}>{tz.replace(/_/g, ' ')}</option>
+                        {/each}
+                      </select>
+                    </div>
+                    <button
+                      class="w-full rounded bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      onclick={handleSignOut}
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                {/if}
               </div>
 
               <!-- Participants List -->
@@ -745,8 +827,9 @@
                               class="relative h-10 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
                               class:bg-green-500={availability[date]?.[timeSlot]}
                               class:bg-gray-100={!availability[date]?.[timeSlot]}
-                              class:cursor-pointer={participantName}
-                              class:cursor-not-allowed={!participantName}
+                              class:cursor-pointer={isLoggedIn}
+                              class:cursor-not-allowed={!isLoggedIn}
+                              disabled={!isLoggedIn}
                               onmousedown={() => startDrag(date, timeSlot)}
                               onmouseenter={() => handleDrag(date, timeSlot)}
                               onmouseup={stopDrag}
@@ -977,3 +1060,4 @@
     }
   }
 </style>
+
