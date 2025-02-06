@@ -35,7 +35,6 @@
 	import { format } from 'date-fns';
 	import Footer from '$lib/Footer.svelte';
 	import Header from '$lib/Header.svelte';
-	import { sha256 } from 'js-sha256'; // Import SHA-256 hashing
 
 	// ========== State Management ==========
 	const eventId = page.params.id;
@@ -324,52 +323,6 @@
 			return;
 		}
 
-		// Password validation
-		let hashedPassword = '';
-		if (showPasswordFields && password) {
-			// Only hash if password is provided and fields are shown (always shown now)
-			if (isNewUser && !password && confirmPassword) {
-				// Allow empty password for new user as well if they choose not to set it
-				passwordError = 'Please fill in both password fields';
-				return;
-			}
-			if (isNewUser && password && password !== confirmPassword) {
-				passwordError = "Passwords don't match";
-				return;
-			}
-			if (isNewUser && password && password.length < 6) {
-				passwordError = 'Password must be at least 6 characters';
-				return;
-			}
-			if (isEditing && editingPassword && !existingParticipantPassword) {
-				// if editing and wants to add password, should enter new password
-				if (!editingPassword) {
-					passwordError = 'Password is required to edit this entry';
-					return;
-				}
-				if (editingPassword.length < 6) {
-					passwordError = 'Password must be at least 6 characters';
-					return;
-				}
-				hashedPassword = sha256(editingPassword); // hash the new editing password
-			} else if (isEditing && editingPassword && existingParticipantPassword) {
-				// if editing and participant already has password, should verify current password
-				hashedPassword = sha256(editingPassword);
-				if (hashedPassword !== existingParticipantPassword) {
-					passwordError = 'Incorrect password';
-					return;
-				}
-				hashedPassword = existingParticipantPassword; // if password verified, use existing hash for save to avoid re-hashing if password not changed
-			} else if (password) {
-				// if new user and password provided
-				hashedPassword = sha256(password);
-			}
-		} else if (isEditing && existingParticipantPassword && !editingPassword) {
-			// if editing existing user with password but no editing password provided
-			passwordError = 'Password is required to edit this entry';
-			return;
-		}
-
 		try {
 			const response = await fetch(`/api/events/${eventId}/responses`, {
 				method: 'POST',
@@ -378,7 +331,8 @@
 					participantName,
 					availability,
 					timezone,
-					password: password ? hashedPassword : undefined // Send hashed password only if password was entered
+					password, // Send plain text password
+					editingPassword // Send plain text editing password
 				})
 			});
 
@@ -554,39 +508,58 @@
 			if (existingParticipant.hasPassword) {
 				if (!loginPassword) {
 					loginError = 'Password is required for this participant.';
-					isLoggedIn = false; // **Ensure isLoggedIn is set to false if password is required but missing**
+					isLoggedIn = false;
 					return;
 				}
-				// Verify password
-				const hashedPassword = sha256(loginPassword);
-				if (hashedPassword === existingParticipant.hasPassword) {
-					isLoggedIn = true;
-					loginError = ''; // Clear any previous login errors on success
-				} else {
-					loginError = 'Incorrect password';
-					isLoggedIn = false; // **Ensure isLoggedIn is set to false on incorrect password**
+
+				try {
+					const response = await fetch(`/api/events/${eventId}/responses`, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							participantName: participantName,
+							loginPassword: loginPassword,
+							verifyPassword: true // Indicate password verification
+						})
+					});
+
+					if (response.ok) {
+						// **Move isLoggedIn setting here, after successful verification**
+						isLoggedIn = true;
+						loginError = '';
+						await refreshEventData(); // Refresh data after successful sign-in
+					} else {
+						const errorData = await response.json();
+						loginError = errorData.error || 'Incorrect password';
+						isLoggedIn = false;
+					}
+				} catch (error) {
+					console.error('Error verifying password:', error);
+					loginError = 'Error verifying password';
+					isLoggedIn = false;
 				}
 			} else {
 				// No password required, sign in directly
 				isLoggedIn = true;
-				loginError = ''; // Clear any previous login errors
+				loginError = '';
+				await refreshEventData(); // Refresh data after successful sign-in
 			}
 		} else {
 			// New user, no password needed for initial sign-in, password creation is optional on save.
 			isNewUser = true;
 			isLoggedIn = true;
-			loginError = ''; // Clear any previous login errors
+			loginError = '';
+			await refreshEventData(); // Refresh data after successful sign-in
 		}
 
 		console.log('SignIn Status:', {
 			participantName,
 			isLoggedIn,
 			loginError,
-			hasPassword: existingParticipant?.hasPassword ? true : false,
-			passwordMatch: existingParticipant?.hasPassword
-				? sha256(loginPassword) === existingParticipant.hasPassword
-				: 'N/A'
-		}); // **Add detailed logging for debugging**
+			hasPassword: existingParticipant?.hasPassword ? true : false
+		});
 	}
 
 	function handleSignOut() {
