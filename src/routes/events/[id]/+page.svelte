@@ -554,24 +554,39 @@
 			if (existingParticipant.hasPassword) {
 				if (!loginPassword) {
 					loginError = 'Password is required for this participant.';
+					isLoggedIn = false; // **Ensure isLoggedIn is set to false if password is required but missing**
 					return;
 				}
 				// Verify password
 				const hashedPassword = sha256(loginPassword);
 				if (hashedPassword === existingParticipant.hasPassword) {
 					isLoggedIn = true;
+					loginError = ''; // Clear any previous login errors on success
 				} else {
 					loginError = 'Incorrect password';
+					isLoggedIn = false; // **Ensure isLoggedIn is set to false on incorrect password**
 				}
 			} else {
 				// No password required, sign in directly
 				isLoggedIn = true;
+				loginError = ''; // Clear any previous login errors
 			}
 		} else {
 			// New user, no password needed for initial sign-in, password creation is optional on save.
 			isNewUser = true;
 			isLoggedIn = true;
+			loginError = ''; // Clear any previous login errors
 		}
+
+		console.log('SignIn Status:', {
+			participantName,
+			isLoggedIn,
+			loginError,
+			hasPassword: existingParticipant?.hasPassword ? true : false,
+			passwordMatch: existingParticipant?.hasPassword
+				? sha256(loginPassword) === existingParticipant.hasPassword
+				: 'N/A'
+		}); // **Add detailed logging for debugging**
 	}
 
 	function handleSignOut() {
@@ -993,7 +1008,10 @@
 					</div>
 					<div class="overflow-x-auto pb-2">
 						<div class="inline-block min-w-full align-middle">
-							<div class="overflow-hidden rounded-lg border border-gray-200">
+							<div
+								class="
+overflow-hidden rounded-lg border border-gray-200"
+							>
 								<div
 									class="grid bg-white"
 									style="grid-template-columns: 60px repeat({event?.dates?.length ||
@@ -1041,3 +1059,28 @@
 
 	<Footer />
 </div>
+
+<!-- Additional Styles for Responsiveness -->
+<style>
+	/* Custom media queries for fine tuning if needed */
+	@media (max-width: 640px) {
+		/* For small mobile devices */
+		main {
+			padding: 1rem;
+		}
+	}
+
+	@media (min-width: 641px) and (max-width: 1024px) {
+		/* For iPad/tablet devices */
+		main {
+			padding: 1.5rem;
+		}
+	}
+
+	@media (min-width: 1025px) {
+		/* For desktop devices, if any extra rules are needed */
+		main {
+			padding: 2rem;
+		}
+	}
+</style>
