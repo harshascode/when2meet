@@ -59,7 +59,7 @@
 	// Add these after the existing state variables
 	let password = $state('');
 	let confirmPassword = $state('');
-	let showPasswordFields = $state(false);
+	let showPasswordFields = $state(true); // Always show password fields
 	let passwordError = $state('');
 	let isEditing = $state(false);
 	let editingPassword = $state('');
@@ -326,31 +326,48 @@
 
 		// Password validation
 		let hashedPassword = '';
-		if (showPasswordFields) {
-			if (isNewUser && (!password || !confirmPassword)) {
+		if (showPasswordFields && password) {
+			// Only hash if password is provided and fields are shown (always shown now)
+			if (isNewUser && !password && confirmPassword) {
+				// Allow empty password for new user as well if they choose not to set it
 				passwordError = 'Please fill in both password fields';
 				return;
 			}
-			if (isNewUser && password !== confirmPassword) {
+			if (isNewUser && password && password !== confirmPassword) {
 				passwordError = "Passwords don't match";
 				return;
 			}
-			if (isNewUser && password.length < 6) {
+			if (isNewUser && password && password.length < 6) {
 				passwordError = 'Password must be at least 6 characters';
 				return;
 			}
-			if (isEditing && !editingPassword) {
-				passwordError = 'Password is required to edit this entry';
-				return;
+			if (isEditing && editingPassword && !existingParticipantPassword) {
+				// if editing and wants to add password, should enter new password
+				if (!editingPassword) {
+					passwordError = 'Password is required to edit this entry';
+					return;
+				}
+				if (editingPassword.length < 6) {
+					passwordError = 'Password must be at least 6 characters';
+					return;
+				}
+				hashedPassword = sha256(editingPassword); // hash the new editing password
+			} else if (isEditing && editingPassword && existingParticipantPassword) {
+				// if editing and participant already has password, should verify current password
+				hashedPassword = sha256(editingPassword);
+				if (hashedPassword !== existingParticipantPassword) {
+					passwordError = 'Incorrect password';
+					return;
+				}
+				hashedPassword = existingParticipantPassword; // if password verified, use existing hash for save to avoid re-hashing if password not changed
+			} else if (password) {
+				// if new user and password provided
+				hashedPassword = sha256(password);
 			}
-
-			// Hash the password
-			hashedPassword = sha256(isNewUser ? password : editingPassword);
-
-			if (isEditing && hashedPassword !== existingParticipantPassword) {
-				passwordError = 'Incorrect password';
-				return;
-			}
+		} else if (isEditing && existingParticipantPassword && !editingPassword) {
+			// if editing existing user with password but no editing password provided
+			passwordError = 'Password is required to edit this entry';
+			return;
 		}
 
 		try {
@@ -361,7 +378,7 @@
 					participantName,
 					availability,
 					timezone,
-					password: showPasswordFields ? hashedPassword : undefined // Send hashed password
+					password: password ? hashedPassword : undefined // Send hashed password only if password was entered
 				})
 			});
 
@@ -381,8 +398,8 @@
 			if (!isEditing) {
 				password = '';
 				confirmPassword = '';
-				showPasswordFields = false;
 			}
+			editingPassword = ''; // clear editing password after save whether success or not
 			passwordError = '';
 		} catch (error: unknown) {
 			handleSaveError(error);
@@ -419,7 +436,8 @@
 				name: response.participant_name,
 				timezone: response.timezone,
 				availability: {},
-				lastUpdated: response.created_at
+				lastUpdated: response.created_at,
+				hasPassword: undefined // Initialize hasPassword as undefined, will be populated later
 			};
 
 			participant.availability[response.date] = participant.availability[response.date] || {};
@@ -427,9 +445,37 @@
 			participantMap.set(response.participant_name, participant);
 		});
 
+		// Fetch participant data to get password hash
 		participants = Array.from(participantMap.values()).sort(
 			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
 		);
+		fetchParticipantData(); // Call function to fetch and update participant data with passwords
+	}
+
+	async function fetchParticipantData() {
+		if (!event) return;
+		try {
+			const response = await fetch(`/api/events/${eventId}/participants`); // Assuming new endpoint to fetch all participant data including passwords
+			if (!response.ok) throw new Error('Failed to fetch participant data');
+			const participantData = await response.json(); // Expecting array of participant objects with hashed passwords
+
+			const participantMap = new Map<string, Participant>();
+			participantData.forEach((data: Participant) => {
+				// Iterate over fetched participant data
+				participantMap.set(data.name, data); // Map by name for easy lookup
+			});
+
+			participants = participants.map((p) => {
+				// Update existing participants array with password info
+				const participantFromData = participantMap.get(p.name);
+				if (participantFromData) {
+					return { ...p, hasPassword: participantFromData.hasPassword }; // Merge existing participant with password info
+				}
+				return p; // Return original if no password info found (shouldn't happen if API works correctly)
+			});
+		} catch (error) {
+			console.error('Error fetching participant passwords:', error); // Log error but don't block UI
+		}
 	}
 
 	// ========== Error Handling ==========
@@ -442,7 +488,7 @@
 	onMount(async () => {
 		// Reset password-related state
 		isEditing = false;
-		showPasswordFields = false;
+		showPasswordFields = true; // Always show password field
 		password = '';
 		confirmPassword = '';
 		editingPassword = '';
@@ -455,7 +501,7 @@
 
 			event = (await response.json()) as Event;
 			initializeAvailability();
-			initializeParticipants();
+			updateParticipants(); // Initialize and fetch participant data on mount
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load event';
 		} finally {
@@ -472,45 +518,20 @@
 		});
 	}
 
-	function initializeParticipants() {
-		if (!event?.responses) return;
-
-		const participantMap = new Map<string, Participant>();
-		event.responses.forEach((response) => {
-			const existingParticipant = participantMap.get(response.participant_name);
-
-			const participant: Participant = existingParticipant ?? {
-				name: response.participant_name,
-				timezone: response.timezone,
-				availability: {},
-				lastUpdated: response.created_at
-			};
-
-			participant.availability[response.date] = participant.availability[response.date] || {};
-			participant.availability[response.date][response.time_slot] = true;
-			participantMap.set(response.participant_name, participant);
-		});
-
-		participants = Array.from(participantMap.values()).sort(
-			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
-		);
-	}
-
 	async function handleNameInput() {
 		nameError = false;
+		showPasswordFields = true; // Always show password fields
 		if (!participantName) return;
 
 		const existingParticipant = participants.find((p) => p.name === participantName);
 		if (existingParticipant) {
 			isNewUser = false;
 			isEditing = true;
-			showPasswordFields = true;
 			passwordError = '';
 			existingParticipantPassword = existingParticipant.hasPassword || ''; // Store existing password
 		} else {
 			isNewUser = true;
 			isEditing = false;
-			showPasswordFields = true; // Show password fields for new users
 			password = '';
 			confirmPassword = '';
 			existingParticipantPassword = '';
@@ -531,6 +552,10 @@
 		if (existingParticipant) {
 			isNewUser = false;
 			if (existingParticipant.hasPassword) {
+				if (!loginPassword) {
+					loginError = 'Password is required for this participant.';
+					return;
+				}
 				// Verify password
 				const hashedPassword = sha256(loginPassword);
 				if (hashedPassword === existingParticipant.hasPassword) {
@@ -539,11 +564,11 @@
 					loginError = 'Incorrect password';
 				}
 			} else {
-				// No password required
+				// No password required, sign in directly
 				isLoggedIn = true;
 			}
 		} else {
-			// New user, no password needed for sign-in
+			// New user, no password needed for initial sign-in, password creation is optional on save.
 			isNewUser = true;
 			isLoggedIn = true;
 		}
@@ -555,7 +580,7 @@
 		password = '';
 		confirmPassword = '';
 		loginPassword = '';
-		showPasswordFields = false;
+		showPasswordFields = true; // Keep showing password fields on sign out as per requirement
 		availability = {};
 		initializeAvailability();
 	}
@@ -571,13 +596,10 @@
 	onmousemove={trackMousePosition}
 	role="presentation"
 >
-	<!-- Header Section -->
 	<Header />
 
-	<!-- Main Content -->
 	<main class="container mx-auto max-w-7xl flex-1 px-4 py-6">
 		{#if loading}
-			<!-- Loading State -->
 			<div class="py-12 text-center">
 				<div
 					class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"
@@ -585,12 +607,9 @@
 				<p class="mt-4 text-sm text-gray-600">Loading event details...</p>
 			</div>
 		{:else if error}
-			<!-- Error State -->
 			<div class="rounded-lg bg-red-50 p-4 text-center text-sm text-red-600">{error}</div>
 		{:else}
-			<!-- Event Content -->
 			<div class="space-y-8">
-				<!-- Event Header -->
 				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 					<h1 class="text-2xl font-semibold text-gray-900">{event?.name}</h1>
 					<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -601,19 +620,15 @@
 					</div>
 				</div>
 
-				<!-- Grid Layout -->
 				<div>
 					<div class="flex flex-col gap-8 lg:flex-row">
-						<!-- Left Sidebar -->
 						<div class="w-full space-y-8 lg:w-1/4">
-							<!-- User Info / Sign-in Section -->
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<h2 class="mb-4 text-lg font-semibold text-gray-900">
 									{isLoggedIn ? 'Your Information' : 'Sign In'}
 								</h2>
 
 								{#if !isLoggedIn}
-									<!-- Sign-in Form -->
 									<div class="space-y-4">
 										<div>
 											<label
@@ -648,14 +663,14 @@
 															for="loginPassword"
 															class="mb-1 block text-sm font-medium text-gray-700"
 														>
-															Password
+															Password (Optional if not set before)
 														</label>
 														<input
 															type="password"
 															id="loginPassword"
 															bind:value={loginPassword}
 															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Enter your password"
+															placeholder="Enter your password if set"
 														/>
 													</div>
 												{:else}
@@ -664,14 +679,14 @@
 															for="password"
 															class="mb-1 block text-sm font-medium text-gray-700"
 														>
-															Create Password
+															Create Password (Optional)
 														</label>
 														<input
 															type="password"
 															id="password"
 															bind:value={password}
 															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Create a password"
+															placeholder="Create a password if you want"
 														/>
 													</div>
 													<div>
@@ -679,14 +694,14 @@
 															for="confirmPassword"
 															class="mb-1 block text-sm font-medium text-gray-700"
 														>
-															Confirm Password
+															Confirm Password (Optional, Required if creating password)
 														</label>
 														<input
 															type="password"
 															id="confirmPassword"
 															bind:value={confirmPassword}
 															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Confirm your password"
+															placeholder="Confirm your password if creating one"
 														/>
 													</div>
 													{#if passwordError}
@@ -708,7 +723,6 @@
 										</button>
 									</div>
 								{:else}
-									<!-- User Information Display -->
 									<div class="space-y-4">
 										<p class="text-sm text-gray-700">
 											Signed in as: <span class="font-medium">{participantName}</span>
@@ -734,7 +748,6 @@
 								{/if}
 							</div>
 
-							<!-- Participants List -->
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<h2 class="mb-4 text-lg font-semibold text-gray-900">
 									Participants ({participants.length})
@@ -776,9 +789,7 @@
 							</div>
 						</div>
 
-						<!-- Right Grid Section -->
 						<div class="w-full gap-6 space-y-8 lg:w-3/4">
-							<!-- Individual Availability Grid -->
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<div class="mb-6 flex flex-col items-center justify-between sm:flex-row">
 									<h2 class="text-lg font-semibold text-gray-900">Your Availability</h2>
@@ -802,7 +813,6 @@
 												style="grid-template-columns: 60px repeat({event?.dates?.length ||
 													0}, minmax(60px, 1fr))"
 											>
-												<!-- Column Headers -->
 												<div
 													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"
 												></div>
@@ -814,7 +824,6 @@
 													</div>
 												{/each}
 
-												<!-- Grid Cells for Your Availability -->
 												{#each event?.timeSlots || [] as timeSlot}
 													<div
 														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
@@ -851,7 +860,6 @@
 								</div>
 							</div>
 
-							<!-- Group Availability Grid -->
 							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 								<div class="mb-6 flex flex-col items-center justify-between sm:flex-row">
 									<h2 class="text-lg font-semibold text-gray-900">
@@ -913,7 +921,6 @@
 			</div>
 		{/if}
 
-		<!-- Hover Tooltip (only active for Group Availability) -->
 		{#if hoveredCell}
 			{@const participants = getParticipantsForSlot(hoveredCell.date, hoveredCell.timeSlot)}
 			<div
@@ -962,7 +969,6 @@
 			</div>
 		{/if}
 
-		<!-- Participant Modal -->
 		{#if selectedParticipant}
 			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
 				<div class="w-full max-w-4xl rounded-xl bg-white p-8 shadow-2xl">
@@ -990,26 +996,27 @@
 							<div class="overflow-hidden rounded-lg border border-gray-200">
 								<div
 									class="grid bg-white"
-									style="grid-template-columns: 120px repeat({event?.dates?.length ||
+									style="grid-template-columns: 60px repeat({event?.dates?.length ||
 										0}, minmax(60px, 1fr))"
 								>
 									<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
 									{#each event?.dates || [] as date}
 										<div
-											class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
+											class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-xs font-medium text-gray-700"
 										>
 											{formatDate(date)}
 										</div>
 									{/each}
+
 									{#each event?.timeSlots || [] as timeSlot}
 										<div
-											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
+											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
 										>
 											{timeSlot}
 										</div>
 										{#each event?.dates || [] as date}
 											<div
-												class="h-10 border-b border-r border-gray-200 transition-colors"
+												class="h-10 border-b border-r border-gray-200"
 												class:bg-green-500={getParticipantAvailability(
 													selectedParticipant,
 													date,
@@ -1032,31 +1039,5 @@
 		{/if}
 	</main>
 
-	<!-- Footer Section -->
 	<Footer />
 </div>
-
-<!-- Additional Styles for Responsiveness -->
-<style>
-	/* Custom media queries for fine tuning if needed */
-	@media (max-width: 640px) {
-		/* For small mobile devices */
-		main {
-			padding: 1rem;
-		}
-	}
-
-	@media (min-width: 641px) and (max-width: 1024px) {
-		/* For iPad/tablet devices */
-		main {
-			padding: 1.5rem;
-		}
-	}
-
-	@media (min-width: 1025px) {
-		/* For desktop devices, if any extra rules are needed */
-		main {
-			padding: 2rem;
-		}
-	}
-</style>
