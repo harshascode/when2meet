@@ -45,6 +45,47 @@ export function initializeDatabase() {
                 time_slot TEXT NOT NULL,
                 FOREIGN KEY (event_id) REFERENCES events(id)
             );
+
+            CREATE TABLE IF NOT EXISTS events (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                creator TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS event_dates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT,
+                date TEXT NOT NULL,
+                FOREIGN KEY (event_id) REFERENCES events(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS event_time_slots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT,
+                time_slot TEXT NOT NULL,
+                FOREIGN KEY (event_id) REFERENCES events(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS responses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT,
+                participant_name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                time_slot TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (event_id) REFERENCES events(id)
+            );
+
+            -- Add new table for participant passwords
+            CREATE TABLE IF NOT EXISTS participant_passwords (
+                event_id TEXT,
+                participant_name TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (event_id, participant_name),
+                FOREIGN KEY (event_id) REFERENCES events(id)
+            );
         `);
 
 		console.log('Database tables created successfully');
@@ -108,5 +149,36 @@ export const dbOperations = {
 	deleteParticipantResponses: db.prepare(`
         DELETE FROM responses 
         WHERE event_id = ? AND participant_name = ?
+    `),
+
+    // Get participant password
+    getParticipantPassword: db.prepare(`
+        SELECT password_hash
+        FROM participant_passwords
+        WHERE event_id = ? AND participant_name = ?
+    `),
+
+    // Set participant password
+    setParticipantPassword: db.prepare(`
+        INSERT OR REPLACE INTO participant_passwords (event_id, participant_name, password_hash)
+        VALUES (?, ?, ?)
+    `),
+
+    // Check if participant has password
+    hasPassword: db.prepare(`
+        SELECT COUNT(*) as count
+        FROM participant_passwords
+        WHERE event_id = ? AND participant_name = ?
+    `),
+
+    // Get participant responses with password status
+    getEventResponsesWithPassword: db.prepare(`
+        SELECT r.*, 
+            CASE WHEN pp.password_hash IS NOT NULL THEN 1 ELSE 0 END as has_password
+        FROM responses r
+        LEFT JOIN participant_passwords pp 
+            ON r.event_id = pp.event_id 
+            AND r.participant_name = pp.participant_name
+        WHERE r.event_id = ?
     `)
 };
