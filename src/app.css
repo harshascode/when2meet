@@ -79,7 +79,7 @@
 }
 
 .availability-scrollbar::-webkit-scrollbar-thumb {
-	@apply bg-gray-300 rounded-full;
+	@apply rounded-full bg-gray-300;
 }
 
 .availability-scrollbar::-webkit-scrollbar-track {

@@ -178,7 +178,7 @@
 		const newGrid: Cell[][] = [];
 		let currentDate = 1;
 		let nextDate = 1;
-		
+
 		for (let week = 0; week < weeks; week++) {
 			const row: Cell[] = [];
 			for (let col = 0; col < 7; col++) {
@@ -257,7 +257,10 @@
 
 	// Update selectedDates based on grid state.
 	function updateSelectedDates() {
-		selectedDates = grid.flat().filter(c => c.selected).map(getFullDate);
+		selectedDates = grid
+			.flat()
+			.filter((c) => c.selected)
+			.map(getFullDate);
 	}
 
 	function handleMouseDown(cell: Cell, event: MouseEvent) {
@@ -321,8 +324,8 @@
 		}
 		if (dragged) {
 			// Update grid cells within the drag range.
-			grid = grid.map(row =>
-				row.map(cell =>
+			grid = grid.map((row) =>
+				row.map((cell) =>
 					cell.row >= dragRange!.minRow &&
 					cell.row <= dragRange!.maxRow &&
 					cell.col >= dragRange!.minCol &&
@@ -338,11 +341,9 @@
 
 	function toggleCell(cell: Cell) {
 		if (dragged) return;
-		grid = grid.map(row =>
-			row.map(c =>
-				c.row === cell.row && c.col === cell.col
-					? { ...c, selected: !c.selected }
-					: c
+		grid = grid.map((row) =>
+			row.map((c) =>
+				c.row === cell.row && c.col === cell.col ? { ...c, selected: !c.selected } : c
 			)
 		);
 		updateSelectedDates();
@@ -430,7 +431,18 @@
 						{#each grid as row}
 							{#each row as cell}
 								<div
-									class="cell {cell.selected ? 'selected' : ''} {cell.inCurrentMonth ? '' : 'other-month'} {isDragging && dragRange && cell.row >= dragRange.minRow && cell.row <= dragRange.maxRow && cell.col >= dragRange.minCol && cell.col <= dragRange.maxCol ? dragMode === 'select' ? 'drag-select' : 'drag-deselect' : ''} {isToday(cell) ? 'today' : ''}"
+									class="cell {cell.selected ? 'selected' : ''} {cell.inCurrentMonth
+										? ''
+										: 'other-month'} {isDragging &&
+									dragRange &&
+									cell.row >= dragRange.minRow &&
+									cell.row <= dragRange.maxRow &&
+									cell.col >= dragRange.minCol &&
+									cell.col <= dragRange.maxCol
+										? dragMode === 'select'
+											? 'drag-select'
+											: 'drag-deselect'
+										: ''} {isToday(cell) ? 'today' : ''}"
 									data-row={cell.row}
 									data-col={cell.col}
 									role="gridcell"
@@ -452,7 +464,9 @@
 			<div class="shadow-xs w-96 rounded-lg border border-gray-200 bg-white p-6">
 				<div class="mb-6 grid grid-cols-2 gap-4">
 					<div>
-						<label for="startTime" class="mb-2 block text-sm font-medium text-gray-700">Start Time</label>
+						<label for="startTime" class="mb-2 block text-sm font-medium text-gray-700"
+							>Start Time</label
+						>
 						<select
 							id="startTime"
 							bind:value={startTime}
@@ -464,7 +478,9 @@
 						</select>
 					</div>
 					<div>
-						<label for="endTime" class="mb-2 block text-sm font-medium text-gray-700">End Time</label>
+						<label for="endTime" class="mb-2 block text-sm font-medium text-gray-700"
+							>End Time</label
+						>
 						<select
 							id="endTime"
 							bind:value={endTime}
@@ -478,7 +494,9 @@
 				</div>
 
 				<div class="mb-6">
-					<label for="timezone" class="mb-2 block text-sm font-medium text-gray-700">Time Zone</label>
+					<label for="timezone" class="mb-2 block text-sm font-medium text-gray-700"
+						>Time Zone</label
+					>
 					<select
 						id="timezone"
 						bind:value={selectedTimeZone}
@@ -493,7 +511,11 @@
 				<div class="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
 					{#each timeSlots as timeSlot (timeSlot.time)}
 						<button
-							class="rounded-sm px-3 py-2 text-xs font-medium transition-colors {selectedTimes.includes(timeSlot.time) ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
+							class="rounded-sm px-3 py-2 text-xs font-medium transition-colors {selectedTimes.includes(
+								timeSlot.time
+							)
+								? 'bg-blue-600 text-white hover:bg-blue-700'
+								: 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
 							onclick={() => toggleTimeSelection(timeSlot.time)}
 						>
 							{timeSlot.formatted}
@@ -553,7 +575,9 @@
 		border: 1px solid #ccc;
 		cursor: pointer;
 		position: relative;
-		transition: background-color 0.2s, border 0.2s;
+		transition:
+			background-color 0.2s,
+			border 0.2s;
 	}
 	.header {
 		font-weight: bold;
