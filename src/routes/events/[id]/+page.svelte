@@ -174,6 +174,7 @@
 
 	function handleCellLeave() {
 		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoverTimeout = null;
 		hoveredCell = null;
 	}
 
@@ -413,9 +414,7 @@
 		{#if loading}
 			<!-- Loading State -->
 			<div class="py-12 text-center">
-				<div
-					class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"
-				></div>
+				<div class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
 				<p class="mt-4 text-sm text-gray-600">Loading event details...</p>
 			</div>
 		{:else if error}
@@ -427,12 +426,9 @@
 				<!-- Event Header -->
 				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 					<h1 class="text-2xl font-semibold text-gray-900">{event?.name}</h1>
-					<div class="mt-3 flex items-center gap-2 text-sm">
+					<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
 						<span class="text-gray-500">Share link:</span>
-						<a
-							href={`${window.location.href}`}
-							class="font-medium text-blue-600 hover:text-blue-700"
-						>
+						<a href={window.location.href} class="font-medium text-blue-600 hover:text-blue-700">
 							{window.location.host}{window.location.pathname}
 						</a>
 					</div>
@@ -442,29 +438,22 @@
 				<div>
 					<div class="flex flex-col gap-8 lg:flex-row">
 						<!-- Left Sidebar -->
-						<div class="min-w-60 space-y-8">
+						<div class="w-full lg:w-1/4 space-y-8">
 							<!-- User Info Section -->
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<h2 class="mb-4 text-lg font-semibold text-gray-900">Your Information</h2>
 								<div class="space-y-4">
 									<div>
-										<label
-											for="participantName"
-											class="mb-1 block text-sm font-medium text-gray-700"
-										>
+										<label for="participantName" class="mb-1 block text-sm font-medium text-gray-700">
 											Name {#if nameError}<span class="text-red-500">*</span>{/if}
 										</label>
 										<input
 											type="text"
 											id="participantName"
 											bind:value={participantName}
-											class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors"
+											class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
 											class:border-red-500={nameError}
 											class:border-gray-300={!nameError}
-											class:focus:ring-red-500={nameError}
-											class:focus:ring-blue-500={!nameError}
-											class:focus:border-red-500={nameError}
-											class:focus:border-blue-500={!nameError}
 											placeholder="Your name"
 											oninput={() => (nameError = false)}
 										/>
@@ -490,9 +479,7 @@
 
 							<!-- Participants List -->
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-								<h2 class="mb-4 text-lg font-semibold text-gray-900">
-									Participants ({participants.length})
-								</h2>
+								<h2 class="mb-4 text-lg font-semibold text-gray-900">Participants ({participants.length})</h2>
 								<div class="divide-y divide-gray-200">
 									{#each participants as participant}
 										<div class="flex items-center justify-between py-3">
@@ -513,12 +500,12 @@
 						</div>
 
 						<!-- Right Grid Section -->
-						<div class="w-full max-w-4xl gap-6 space-y-8">
+						<div class="w-full lg:w-3/4 gap-6 space-y-8">
 							<!-- Individual Availability Grid -->
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-								<div class="mb-6 flex items-center justify-between">
+								<div class="mb-6 flex flex-col sm:flex-row items-center justify-between">
 									<h2 class="text-lg font-semibold text-gray-900">Your Availability</h2>
-									<div class="flex gap-4">
+									<div class="flex gap-4 mt-2 sm:mt-0">
 										<div class="flex items-center gap-2">
 											<div class="h-4 w-4 rounded-sm border border-gray-300 bg-gray-200"></div>
 											<span class="text-sm text-gray-600">No</span>
@@ -535,30 +522,22 @@
 										<div class="overflow-hidden rounded-lg border border-gray-200">
 											<div
 												class="grid bg-white"
-												style="grid-template-columns: 60px repeat({event?.dates?.length ||
-													0}, minmax(60px, 1fr))"
+												style="grid-template-columns: 60px repeat({event?.dates?.length || 0}, minmax(60px, 1fr))"
 											>
 												<!-- Column Headers -->
-												<div
-													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"
-												></div>
+												<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
 												{#each event?.dates || [] as date}
-													<div
-														class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-xs font-medium text-gray-700"
-													>
+													<div class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-xs font-medium text-gray-700">
 														{formatDate(date)}
 													</div>
 												{/each}
 
 												<!-- Grid Cells -->
 												{#each event?.timeSlots || [] as timeSlot}
-													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
-													>
+													<div class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600">
 														{timeSlot}
 													</div>
 													{#each event?.dates || [] as date}
-														<!-- svelte-ignore a11y_mouse_events_have_key_events -->
 														<button
 															type="button"
 															class="relative h-10 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
@@ -566,7 +545,6 @@
 															class:bg-gray-100={!availability[date]?.[timeSlot]}
 															class:cursor-pointer={participantName}
 															class:cursor-not-allowed={!participantName}
-															class:hover:bg-opacity-90={participantName}
 															onmousedown={() => startDrag(date, timeSlot)}
 															onmouseover={() => handleCellHover(date, timeSlot)}
 															onmouseout={handleCellLeave}
@@ -591,17 +569,14 @@
 							</div>
 
 							<!-- Group Availability Grid -->
-							<!-- Group Availability Grid -->
 							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-								<div class="mb-6 flex items-center justify-between">
+								<div class="mb-6 flex flex-col sm:flex-row items-center justify-between">
 									<h2 class="text-lg font-semibold text-gray-900">
 										Group Availability ({event?.responses?.length || 0})
 									</h2>
 									<div class="flex items-center gap-2">
 										<span class="text-xs text-gray-500">0%</span>
-										<div
-											class="h-3 w-24 rounded-full bg-gradient-to-r from-gray-100 to-green-500"
-										></div>
+										<div class="h-3 w-24 rounded-full bg-gradient-to-r from-gray-100 to-green-500"></div>
 										<span class="text-xs text-gray-500">100%</span>
 									</div>
 								</div>
@@ -610,32 +585,22 @@
 										<div class="overflow-hidden rounded-lg border border-gray-200">
 											<div
 												class="grid bg-white"
-												style="grid-template-columns: 60px repeat({event?.dates?.length ||
-													0}, minmax(60px, 1fr))"
+												style="grid-template-columns: 60px repeat({event?.dates?.length || 0}, minmax(60px, 1fr))"
 											>
-												<div
-													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"
-												></div>
+												<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
 												{#each event?.dates || [] as date}
-													<div
-														class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
-													>
+													<div class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700">
 														{formatDate(date)}
 													</div>
 												{/each}
 												{#each event?.timeSlots || [] as timeSlot}
-													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
-													>
+													<div class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600">
 														{timeSlot}
 													</div>
 													{#each event?.dates || [] as date}
 														<div
 															class="h-10 border-b border-r border-gray-200"
-															style="background-color: rgba(34, 197, 94, {getGroupAvailability(
-																date,
-																timeSlot
-															) / 100})"
+															style="background-color: rgba(34, 197, 94, {getGroupAvailability(date, timeSlot) / 100})"
 															onmouseover={() => handleCellHover(date, timeSlot)}
 															onmouseout={handleCellLeave}
 														></div>
@@ -703,24 +668,18 @@
 
 		<!-- Participant Modal -->
 		{#if selectedParticipant}
-			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
 				<div class="w-full max-w-4xl rounded-xl bg-white p-8 shadow-2xl">
 					<div class="mb-6 flex items-center justify-between">
 						<h3 class="text-xl font-bold text-gray-900">
 							{selectedParticipant.name}'s Availability
 						</h3>
-						<!-- svelte-ignore a11y_consider_explicit_label -->
 						<button
 							class="rounded-lg p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
 							onclick={() => (selectedParticipant = null)}
 						>
 							<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M6 18L18 6M6 6l12 12"
-								/>
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
 							</svg>
 						</button>
 					</div>
@@ -729,36 +688,23 @@
 							<div class="overflow-hidden rounded-lg border border-gray-200">
 								<div
 									class="grid bg-white"
-									style="grid-template-columns: 120px repeat({event?.dates?.length ||
-										0}, minmax(60px, 1fr))"
+									style="grid-template-columns: 120px repeat({event?.dates?.length || 0}, minmax(60px, 1fr))"
 								>
 									<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
 									{#each event?.dates || [] as date}
-										<div
-											class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700"
-										>
+										<div class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-sm font-medium text-gray-700">
 											{formatDate(date)}
 										</div>
 									{/each}
 									{#each event?.timeSlots || [] as timeSlot}
-										<div
-											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600"
-										>
+										<div class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-sm text-gray-600">
 											{timeSlot}
 										</div>
 										{#each event?.dates || [] as date}
 											<div
 												class="h-10 border-b border-r border-gray-200 transition-colors"
-												class:bg-green-500={getParticipantAvailability(
-													selectedParticipant,
-													date,
-													timeSlot
-												)}
-												class:bg-gray-100={!getParticipantAvailability(
-													selectedParticipant,
-													date,
-													timeSlot
-												)}
+												class:bg-green-500={getParticipantAvailability(selectedParticipant, date, timeSlot)}
+												class:bg-gray-100={!getParticipantAvailability(selectedParticipant, date, timeSlot)}
 											></div>
 										{/each}
 									{/each}
@@ -775,44 +721,27 @@
 	<Footer />
 </div>
 
-<!-- Styles -->
+<!-- Additional Styles for Responsiveness -->
 <style>
-	.relative {
-		position: relative;
+	/* Custom media queries for fine tuning if needed */
+	@media (max-width: 640px) {
+		/* For small mobile devices */
+		main {
+			padding: 1rem;
+		}
 	}
-	.absolute {
-		position: absolute;
+
+	@media (min-width: 641px) and (max-width: 1024px) {
+		/* For iPad/tablet devices */
+		main {
+			padding: 1.5rem;
+		}
 	}
-	.inset-0 {
-		top: 0;
-		right: 0;
-		bottom: 0;
-		left: 0;
-	}
-	.opacity-50 {
-		opacity: 0.5;
-	}
-	.pointer-events-none {
-		pointer-events: none;
-	}
-	.bg-blue-200 {
-		background-color: #bfdbfe;
-	}
-	.fixed {
-		position: fixed;
-	}
-	.z-50 {
-		z-index: 50;
-	}
-	.shadow-lg {
-		box-shadow:
-			0 10px 15px -3px rgb(0 0 0 / 0.1),
-			0 4px 6px -4px rgb(0 0 0 / 0.1);
-	}
-	.rounded-lg {
-		border-radius: 0.5rem;
-	}
-	.min-w-\[300px\] {
-		min-width: 300px;
+
+	@media (min-width: 1025px) {
+		/* For desktop devices, if any extra rules are needed */
+		main {
+			padding: 2rem;
+		}
 	}
 </style>
