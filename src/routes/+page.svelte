@@ -120,6 +120,17 @@
 				body: JSON.stringify(eventData)
 			});
 			if (!response.ok) throw new Error('Failed to create event');
+
+			// Add the event to localStorage
+			const storedEvents = localStorage.getItem('createdEvents');
+			const events = storedEvents ? JSON.parse(storedEvents) : [];
+			events.push({
+				id: eventData.id,
+				name: eventData.name,
+				createdAt: new Date().toISOString()
+			});
+			localStorage.setItem('createdEvents', JSON.stringify(events));
+
 			window.location.href = `/events/${eventData.id}`;
 		} catch (error) {
 			alert('Failed to create event. Please try again.');
