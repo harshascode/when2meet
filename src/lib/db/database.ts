@@ -77,7 +77,6 @@ export function initializeDatabase() {
                 FOREIGN KEY (event_id) REFERENCES events(id)
             );
 
-            -- Add new table for participant passwords
             CREATE TABLE IF NOT EXISTS participant_passwords (
                 event_id TEXT,
                 participant_name TEXT NOT NULL,
@@ -86,6 +85,7 @@ export function initializeDatabase() {
                 PRIMARY KEY (event_id, participant_name),
                 FOREIGN KEY (event_id) REFERENCES events(id)
             );
+            
         `);
 
 		console.log('Database tables created successfully');
@@ -151,28 +151,28 @@ export const dbOperations = {
         WHERE event_id = ? AND participant_name = ?
     `),
 
-    // Get participant password
-    getParticipantPassword: db.prepare(`
+	// Get participant password
+	getParticipantPassword: db.prepare(`
         SELECT password_hash
         FROM participant_passwords
         WHERE event_id = ? AND participant_name = ?
     `),
 
-    // Set participant password
-    setParticipantPassword: db.prepare(`
+	// Set participant password
+	setParticipantPassword: db.prepare(`
         INSERT OR REPLACE INTO participant_passwords (event_id, participant_name, password_hash)
         VALUES (?, ?, ?)
     `),
 
-    // Check if participant has password
-    hasPassword: db.prepare(`
+	// Check if participant has password
+	hasPassword: db.prepare(`
         SELECT COUNT(*) as count
         FROM participant_passwords
         WHERE event_id = ? AND participant_name = ?
     `),
 
-    // Get participant responses with password status
-    getEventResponsesWithPassword: db.prepare(`
+	// Get participant responses with password status
+	getEventResponsesWithPassword: db.prepare(`
         SELECT r.*, 
             CASE WHEN pp.password_hash IS NOT NULL THEN 1 ELSE 0 END as has_password
         FROM responses r

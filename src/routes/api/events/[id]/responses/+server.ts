@@ -1,9 +1,7 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
+import { json, type RequestHandler } from '@sveltejs/kit';
 import { dbOperations } from '$lib/db/database';
-import bcrypt from 'bcrypt';
+import { sha256 } from 'js-sha256';
 
-// Add these type definitions
 interface HasPasswordResult {
 	count: number;
 }
@@ -14,15 +12,8 @@ interface StoredPassword {
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	try {
-		const {
-			participantName,
-			availability,
-			timezone,
-			password,
-			editingPassword,
-			verifyPassword, // New property to indicate password verification
-			loginPassword // New property to hold the login password
-		} = await request.json();
+		const { participantName, availability, timezone, password, verifyPassword, loginPassword } =
+			await request.json();
 
 		if (verifyPassword) {
 			// Password verification logic
@@ -66,10 +57,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				);
 			}
 
-			const passwordValid = await bcrypt.compare(
-				loginPassword,
-				storedPassword.password_hash
-			);
+			// Compare SHA256 hashes directly
+			const passwordValid = loginPassword === storedPassword.password_hash;
+
 			if (!passwordValid) {
 				return json(
 					{
@@ -100,50 +90,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			) as HasPasswordResult;
 			const participantHasPassword = hasPasswordResult.count > 0;
 
-			if (participantHasPassword) {
-				const storedPassword = dbOperations.getParticipantPassword.get(
-					params.id,
-					participantName
-				) as StoredPassword;
-
-				if (!editingPassword && password) {
-					return json(
-						{
-							success: false,
-							error: 'Password required',
-							type: 'password_required'
-						},
-						{ status: 401 }
-					);
-				}
-
-				if (editingPassword) {
-					const passwordValid = await bcrypt.compare(
-						editingPassword,
-						storedPassword.password_hash
-					);
-					if (!passwordValid) {
-						return json(
-							{
-								success: false,
-								error: 'Incorrect password',
-								type: 'password_required'
-							},
-							{ status: 401 }
-						);
-					}
-				}
-			}
-
-			// Handle new participant with password
+			// Handle new participant with password OR password change
 			if (!participantHasPassword && password) {
-				const saltRounds = 10;
-				const passwordHash = await bcrypt.hash(password, saltRounds);
-				dbOperations.setParticipantPassword.run(
-					params.id,
-					participantName,
-					passwordHash
-				);
+				// Store SHA256 hash directly
+				dbOperations.setParticipantPassword.run(params.id, participantName, password);
 			}
 
 			// Delete existing responses
@@ -177,16 +127,22 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
 export const GET: RequestHandler = async ({ params }) => {
 	try {
+		const event = dbOperations.getEvent.get(params.id);
+		const eventDates = dbOperations.getEventDates.all(params.id);
+		const eventTimeSlots = dbOperations.getEventTimeSlots.all(params.id);
+		// const responses = dbOperations.getEventResponses.all(params.id); // Original
+
+		// Fetch responses with password status
 		const responses = dbOperations.getEventResponsesWithPassword.all(params.id);
-		return json(responses);
+
+		return json({
+			...(typeof event === 'object' && event !== null ? event : {}), // Ensure event is an object
+			dates: eventDates.map((d: any) => d.date as string), // Explicit type annotation
+			timeSlots: eventTimeSlots.map((t: any) => t.time_slot as string), // Explicit type annotation
+			responses: responses
+		});
 	} catch (error) {
-		console.error('Error fetching responses:', error);
-		return json(
-			{
-				success: false,
-				error: 'Failed to fetch responses'
-			},
-			{ status: 500 }
-		);
+		console.error('Error fetching event:', error);
+		return json({ error: 'Failed to fetch event' }, { status: 500 });
 	}
 };

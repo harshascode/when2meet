@@ -11,7 +11,7 @@
 		timezone: string;
 		availability: Availability;
 		lastUpdated: string;
-		hasPassword?: string; // Store the hashed password
+		hasPassword?: boolean; // Store the hashed password
 	}
 
 	interface Response {
@@ -20,6 +20,7 @@
 		time_slot: string;
 		created_at: string;
 		timezone: string;
+		hasPassword?: boolean; // hasPassword is now part of the Response
 	}
 
 	interface Event {
@@ -30,52 +31,51 @@
 	}
 
 	// ========== Imports ==========
-	import { page } from '$app/state';
+	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
 	import Footer from '$lib/Footer.svelte';
 	import Header from '$lib/Header.svelte';
+	import { sha256 } from 'js-sha256'; // Import SHA-256
 
 	// ========== State Management ==========
-	const eventId = page.params.id;
+	const eventId = $page.params.id;
 
-	let event: Event | null = $state(null);
-	let loading = $state(true);
-	let error: string | null = $state(null);
+	let event: Event | null = null;
+	let loading = true;
+	let error: string | null = null;
 
-	let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
-	let participantName = $state('');
-	let availability: Availability = $state({});
+	let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	let participantName = '';
+	let availability: Availability = {};
 
-	let participants: Participant[] = $state([]);
-	let selectedParticipant: Participant | null = $state(null);
+	let participants: Participant[] = [];
+	let selectedParticipant: Participant | null = null;
 
-	let isDragging = $state(false);
-	let nameError = $state(false);
-	let mouseX = $state(0);
-	let mouseY = $state(0);
+	let isDragging = false;
+	let nameError = false;
+	let mouseX = 0;
+	let mouseY = 0;
 
 	// Add these after the existing state variables
-	let password = $state('');
-	let confirmPassword = $state('');
-	let showPasswordFields = $state(true); // Always show password fields
-	let passwordError = $state('');
-	let isEditing = $state(false);
-	let editingPassword = $state('');
-	let existingParticipantPassword = $state(''); // Store existing password hash
-	let isLoggedIn = $state(false); // Track login status
-	let loginPassword = $state(''); // Password for login
-	let loginError = $state(''); // Error message for login
-	let isNewUser = $state(false); // Track if the user is new
+	let password = '';
+	let confirmPassword = '';
+	let showPasswordFields = true; // Always show password fields
+	let passwordError = '';
+	let isEditing = false;
+	let isLoggedIn = false; // Track login status
+	let loginPassword = ''; // Password for login
+	let loginError = ''; // Error message for login
+	let isNewUser = false; // Track if the user is new
 
-	let dragSelection = $state<{
-		start: { date: string; timeSlot: string } | null;
-		end: { date: string; timeSlot: string } | null;
-	}>({ start: null, end: null });
+	let dragSelection = {
+		start: null as { date: string; timeSlot: string } | null,
+		end: null as { date: string; timeSlot: string } | null
+	};
 
 	// This hoveredCell will only be set by the group availability grid cells.
-	let hoveredCell = $state<{ date: string; timeSlot: string } | null>(null);
-	let hoverTimeout: ReturnType<typeof setTimeout> | null = $state(null);
+	let hoveredCell: { date: string; timeSlot: string } | null = null;
+	let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// ========== Constants ==========
 	const timezones = Intl.supportedValuesOf('timeZone');
@@ -143,12 +143,14 @@
 		}
 
 		const touch = e.touches[0];
-		initialTouchX = touch.clientX;
-		initialTouchY = touch.clientY;
+		let initialTouchX = touch.clientX;
+		let initialTouchY = touch.clientY;
 	}
 
 	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
 		const touch = e.touches[0];
+		let initialTouchX = 0;
+		let initialTouchY = 0;
 		const deltaX = Math.abs(touch.clientX - initialTouchX);
 		const deltaY = Math.abs(touch.clientY - initialTouchY);
 
@@ -163,6 +165,8 @@
 
 	function handleTouchEnd(e: TouchEvent, date: string, timeSlot: string) {
 		const touch = e.touches[0];
+		let initialTouchX = 0;
+		let initialTouchY = 0;
 		const deltaX = Math.abs(touch.clientX - initialTouchX);
 		const deltaY = Math.abs(touch.clientY - initialTouchY);
 
@@ -213,8 +217,8 @@
 	function updateDragSelection() {
 		if (!dragSelection.start || !dragSelection.end || !event) return;
 
-		const dates = event.dates;
-		const timeSlots = event.timeSlots;
+		const dates = event.dates || [];
+		const timeSlots = event.timeSlots || [];
 		const startDateIdx = dates.indexOf(dragSelection.start.date);
 		const endDateIdx = dates.indexOf(dragSelection.end.date);
 		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
@@ -249,8 +253,8 @@
 	function getGroupAvailability(date: string, timeSlot: string): number {
 		if (!event?.responses) return 0;
 
-		const uniqueParticipants = new Set(event.responses.map((r) => r.participant_name));
-		const responsesForSlot = event.responses.filter(
+		const uniqueParticipants = new Set((event.responses || []).map((r) => r.participant_name));
+		const responsesForSlot = (event.responses || []).filter(
 			(r) => r.date === date && r.time_slot === timeSlot
 		);
 
@@ -266,7 +270,7 @@
 		const available = new Set<string>();
 		const allParticipants = new Set<string>();
 
-		event.responses.forEach((response) => {
+		(event.responses || []).forEach((response) => {
 			allParticipants.add(response.participant_name);
 			if (response.date === date && response.time_slot === timeSlot) {
 				available.add(response.participant_name);
@@ -294,8 +298,8 @@
 	function isInDragSelection(date: string, timeSlot: string): boolean {
 		if (!dragSelection.start || !dragSelection.end || !event) return false;
 
-		const dates = event.dates;
-		const timeSlots = event.timeSlots;
+		const dates = event.dates || [];
+		const timeSlots = event.timeSlots || [];
 		const currentDateIdx = dates.indexOf(date);
 		const currentTimeIdx = timeSlots.indexOf(timeSlot);
 
@@ -324,6 +328,8 @@
 		}
 
 		try {
+			const hashedPassword = password ? sha256(password) : null;
+
 			const response = await fetch(`/api/events/${eventId}/responses`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -331,8 +337,7 @@
 					participantName,
 					availability,
 					timezone,
-					password, // Send plain text password
-					editingPassword // Send plain text editing password
+					password: hashedPassword // Send hashed password
 				})
 			});
 
@@ -353,7 +358,6 @@
 				password = '';
 				confirmPassword = '';
 			}
-			editingPassword = ''; // clear editing password after save whether success or not
 			passwordError = '';
 		} catch (error: unknown) {
 			handleSaveError(error);
@@ -372,10 +376,18 @@
 
 	// ========== Data Management ==========
 	async function refreshEventData() {
-		const eventResponse = await fetch(`/api/events/${eventId}`);
-		if (eventResponse.ok) {
-			event = (await eventResponse.json()) as Event;
+		try {
+			const response = await fetch(`/api/events/${eventId}`);
+			if (!response.ok) throw new Error('Event not found');
+
+			const data = await response.json();
+			event = data as Event;
+
 			updateParticipants();
+		} catch (e: any) {
+			error = e.message || 'Failed to load event';
+		} finally {
+			loading = false;
 		}
 	}
 
@@ -383,7 +395,7 @@
 		if (!event?.responses) return;
 
 		const participantMap = new Map<string, Participant>();
-		event.responses.forEach((response) => {
+		(event.responses || []).forEach((response) => {
 			const existingParticipant = participantMap.get(response.participant_name);
 
 			const participant: Participant = existingParticipant ?? {
@@ -391,7 +403,7 @@
 				timezone: response.timezone,
 				availability: {},
 				lastUpdated: response.created_at,
-				hasPassword: undefined // Initialize hasPassword as undefined, will be populated later
+				hasPassword: response.hasPassword // Use the hasPassword from the response
 			};
 
 			participant.availability[response.date] = participant.availability[response.date] || {};
@@ -399,37 +411,9 @@
 			participantMap.set(response.participant_name, participant);
 		});
 
-		// Fetch participant data to get password hash
 		participants = Array.from(participantMap.values()).sort(
 			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
 		);
-		fetchParticipantData(); // Call function to fetch and update participant data with passwords
-	}
-
-	async function fetchParticipantData() {
-		if (!event) return;
-		try {
-			const response = await fetch(`/api/events/${eventId}/participants`); // Assuming new endpoint to fetch all participant data including passwords
-			if (!response.ok) throw new Error('Failed to fetch participant data');
-			const participantData = await response.json(); // Expecting array of participant objects with hashed passwords
-
-			const participantMap = new Map<string, Participant>();
-			participantData.forEach((data: Participant) => {
-				// Iterate over fetched participant data
-				participantMap.set(data.name, data); // Map by name for easy lookup
-			});
-
-			participants = participants.map((p) => {
-				// Update existing participants array with password info
-				const participantFromData = participantMap.get(p.name);
-				if (participantFromData) {
-					return { ...p, hasPassword: participantFromData.hasPassword }; // Merge existing participant with password info
-				}
-				return p; // Return original if no password info found (shouldn't happen if API works correctly)
-			});
-		} catch (error) {
-			console.error('Error fetching participant passwords:', error); // Log error but don't block UI
-		}
 	}
 
 	// ========== Error Handling ==========
@@ -445,28 +429,21 @@
 		showPasswordFields = true; // Always show password field
 		password = '';
 		confirmPassword = '';
-		editingPassword = '';
 		passwordError = '';
-		existingParticipantPassword = '';
 
 		try {
-			const response = await fetch(`/api/events/${eventId}`);
-			if (!response.ok) throw new Error('Event not found');
-
-			event = (await response.json()) as Event;
-			initializeAvailability();
-			updateParticipants(); // Initialize and fetch participant data on mount
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load event';
+			await refreshEventData();
+		} catch (e: any) {
+			error = e.message || 'Failed to load event';
 		} finally {
 			loading = false;
 		}
 	});
 
 	function initializeAvailability() {
-		event?.dates.forEach((date) => {
+		event?.dates?.forEach((date) => {
 			availability[date] = {};
-			event?.timeSlots.forEach((timeSlot) => {
+			event?.timeSlots?.forEach((timeSlot) => {
 				availability[date][timeSlot] = false;
 			});
 		});
@@ -482,85 +459,86 @@
 			isNewUser = false;
 			isEditing = true;
 			passwordError = '';
-			existingParticipantPassword = existingParticipant.hasPassword || ''; // Store existing password
 		} else {
 			isNewUser = true;
 			isEditing = false;
 			password = '';
 			confirmPassword = '';
-			existingParticipantPassword = '';
 		}
 	}
 
 	async function handleSignIn() {
-		nameError = false;
-		loginError = '';
+    nameError = false;
+    loginError = '';
 
-		if (!participantName) {
-			nameError = true;
-			return;
-		}
+    if (!participantName) {
+        nameError = true;
+        return;
+    }
 
-		const existingParticipant = participants.find((p) => p.name === participantName);
+    const existingParticipant = participants.find((p) => p.name === participantName);
 
-		if (existingParticipant) {
-			isNewUser = false;
-			if (existingParticipant.hasPassword) {
-				if (!loginPassword) {
-					loginError = 'Password is required for this participant.';
-					isLoggedIn = false;
-					return;
-				}
+    if (existingParticipant) {
+        isNewUser = false;
+        if (existingParticipant.hasPassword) {
+            if (!loginPassword) {
+                loginError = 'Password is required for this participant.';
+                isLoggedIn = false;
+                return;
+            }
 
-				try {
-					const response = await fetch(`/api/events/${eventId}/responses`, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						},
-						body: JSON.stringify({
-							participantName: participantName,
-							loginPassword: loginPassword,
-							verifyPassword: true // Indicate password verification
-						})
-					});
+            try {
+                const hashedLoginPassword = sha256(loginPassword);
 
-					if (response.ok) {
-						// **Move isLoggedIn setting here, after successful verification**
-						isLoggedIn = true;
-						loginError = '';
-						await refreshEventData(); // Refresh data after successful sign-in
-					} else {
-						const errorData = await response.json();
-						loginError = errorData.error || 'Incorrect password';
-						isLoggedIn = false;
-					}
-				} catch (error) {
-					console.error('Error verifying password:', error);
-					loginError = 'Error verifying password';
-					isLoggedIn = false;
-				}
-			} else {
-				// No password required, sign in directly
-				isLoggedIn = true;
-				loginError = '';
-				await refreshEventData(); // Refresh data after successful sign-in
-			}
-		} else {
-			// New user, no password needed for initial sign-in, password creation is optional on save.
-			isNewUser = true;
-			isLoggedIn = true;
-			loginError = '';
-			await refreshEventData(); // Refresh data after successful sign-in
-		}
+                const response = await fetch(`/api/events/${eventId}/responses`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        participantName: participantName,
+                        loginPassword: hashedLoginPassword,
+                        verifyPassword: true // Indicate password verification
+                    })
+                });
 
-		console.log('SignIn Status:', {
-			participantName,
-			isLoggedIn,
-			loginError,
-			hasPassword: existingParticipant?.hasPassword ? true : false
-		});
-	}
+                if (response.ok) {
+                    // **Move isLoggedIn setting here, after successful verification**
+                    isLoggedIn = true;
+                    loginError = '';
+                    await refreshEventData(); // Refresh data after successful sign-in
+                } else {
+                    const errorData = await response.json();
+                    loginError = errorData.error || 'Incorrect password';
+                    isLoggedIn = false;
+                }
+            } catch (error) {
+                console.error('Error verifying password:', error);
+                loginError = 'Error verifying password';
+                isLoggedIn = false;
+            }
+        } else {
+            // No password required, sign in directly
+            isLoggedIn = true;
+            loginError = '';
+            await refreshEventData(); // Refresh data after successful sign-in
+        }
+    } else {
+        // New user, no password needed for initial sign-in, password creation is optional on save.
+        isNewUser = true;
+        isLoggedIn = true;
+        loginError = '';
+        await refreshEventData(); // Refresh data after successful sign-in
+    }
+
+    console.log('SignIn Status:', {
+        participantName,
+        isLoggedIn,
+        loginError,
+        hasPassword: existingParticipant?.hasPassword ? true : false
+    });
+}
+
 
 	function handleSignOut() {
 		isLoggedIn = false;
@@ -651,14 +629,14 @@
 															for="loginPassword"
 															class="mb-1 block text-sm font-medium text-gray-700"
 														>
-															Password (Optional if not set before)
+															Password
 														</label>
 														<input
 															type="password"
 															id="loginPassword"
 															bind:value={loginPassword}
 															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Enter your password if set"
+															placeholder="Enter your password"
 														/>
 													</div>
 												{:else}
@@ -667,14 +645,14 @@
 															for="password"
 															class="mb-1 block text-sm font-medium text-gray-700"
 														>
-															Create Password (Optional)
+															Create Password
 														</label>
 														<input
 															type="password"
 															id="password"
 															bind:value={password}
 															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Create a password if you want"
+															placeholder="Create a password"
 														/>
 													</div>
 													<div>
@@ -682,14 +660,14 @@
 															for="confirmPassword"
 															class="mb-1 block text-sm font-medium text-gray-700"
 														>
-															Confirm Password (Optional, Required if creating password)
+															Confirm Password
 														</label>
 														<input
 															type="password"
 															id="confirmPassword"
 															bind:value={confirmPassword}
 															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Confirm your password if creating one"
+															placeholder="Confirm your password"
 														/>
 													</div>
 													{#if passwordError}
