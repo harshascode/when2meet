@@ -1,4 +1,12 @@
 <script lang="ts">
+	// ========== Imports ==========
+	import { page } from '$app/stores';
+	import { onMount } from 'svelte';
+	import { format } from 'date-fns';
+	import Footer from '$lib/Footer.svelte';
+	import Header from '$lib/Header.svelte';
+	import { sha256 } from 'js-sha256'; // Import SHA-256
+
 	// ========== Type Definitions ==========
 	interface Availability {
 		[date: string]: {
@@ -29,14 +37,6 @@
 		timeSlots: string[];
 		responses: Response[];
 	}
-
-	// ========== Imports ==========
-	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
-	import { format } from 'date-fns';
-	import Footer from '$lib/Footer.svelte';
-	import Header from '$lib/Header.svelte';
-	import { sha256 } from 'js-sha256'; // Import SHA-256
 
 	// ========== State Management ==========
 	const eventId = $page.params.id;
@@ -468,77 +468,76 @@
 	}
 
 	async function handleSignIn() {
-    nameError = false;
-    loginError = '';
+		nameError = false;
+		loginError = '';
 
-    if (!participantName) {
-        nameError = true;
-        return;
-    }
+		if (!participantName) {
+			nameError = true;
+			return;
+		}
 
-    const existingParticipant = participants.find((p) => p.name === participantName);
+		const existingParticipant = participants.find((p) => p.name === participantName);
 
-    if (existingParticipant) {
-        isNewUser = false;
-        if (existingParticipant.hasPassword) {
-            if (!loginPassword) {
-                loginError = 'Password is required for this participant.';
-                isLoggedIn = false;
-                return;
-            }
+		if (existingParticipant) {
+			isNewUser = false;
+			if (existingParticipant.hasPassword) {
+				if (!loginPassword) {
+					loginError = 'Password is required for this participant.';
+					isLoggedIn = false;
+					return;
+				}
 
-            try {
-                const hashedLoginPassword = sha256(loginPassword);
+				try {
+					const hashedLoginPassword = sha256(loginPassword);
 
-                const response = await fetch(`/api/events/${eventId}/responses`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        participantName: participantName,
-                        loginPassword: hashedLoginPassword,
-                        verifyPassword: true // Indicate password verification
-                    })
-                });
+					const response = await fetch(`/api/events/${eventId}/responses`, {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							participantName: participantName,
+							loginPassword: hashedLoginPassword,
+							verifyPassword: true // Indicate password verification
+						})
+					});
 
-                if (response.ok) {
-                    // **Move isLoggedIn setting here, after successful verification**
-                    isLoggedIn = true;
-                    loginError = '';
-                    await refreshEventData(); // Refresh data after successful sign-in
-                } else {
-                    const errorData = await response.json();
-                    loginError = errorData.error || 'Incorrect password';
-                    isLoggedIn = false;
-                }
-            } catch (error) {
-                console.error('Error verifying password:', error);
-                loginError = 'Error verifying password';
-                isLoggedIn = false;
-            }
-        } else {
-            // No password required, sign in directly
-            isLoggedIn = true;
-            loginError = '';
-            await refreshEventData(); // Refresh data after successful sign-in
-        }
-    } else {
-        // New user, no password needed for initial sign-in, password creation is optional on save.
-        isNewUser = true;
-        isLoggedIn = true;
-        loginError = '';
-        await refreshEventData(); // Refresh data after successful sign-in
-    }
+					if (response.ok) {
+						// **Move isLoggedIn setting here, after successful verification**
+						isLoggedIn = true;
+						loginError = '';
+						await refreshEventData(); // Refresh data after successful sign-in
+					} else {
+						const errorData = await response.json();
+						loginError = errorData.error || 'Incorrect password';
+						isLoggedIn = false;
+					}
+				} catch (error) {
+					console.error('Error verifying password:', error);
+					loginError = 'Error verifying password';
+					isLoggedIn = false;
+				}
+			} else {
+				// No password required, sign in directly
+				isLoggedIn = true;
+				loginError = '';
+				await refreshEventData(); // Refresh data after successful sign-in
+			}
+		} else {
+			// New user, no password needed for initial sign-in, password creation is optional on save.
+			isNewUser = true;
+			isLoggedIn = true;
+			loginError = '';
+			await refreshEventData(); // Refresh data after successful sign-in
+		}
 
-    console.log('SignIn Status:', {
-        participantName,
-        isLoggedIn,
-        loginError,
-        hasPassword: existingParticipant?.hasPassword ? true : false
-    });
-}
-
+		console.log('SignIn Status:', {
+			participantName,
+			isLoggedIn,
+			loginError,
+			hasPassword: existingParticipant?.hasPassword ? true : false
+		});
+	}
 
 	function handleSignOut() {
 		isLoggedIn = false;
@@ -996,7 +995,7 @@ overflow-hidden rounded-lg border border-gray-200"
 													date,
 													timeSlot
 												)}
-											></div>
+									     		></div>
 										{/each}
 									{/each}
 								</div>
