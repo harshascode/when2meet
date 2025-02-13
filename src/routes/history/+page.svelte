@@ -7,7 +7,7 @@
         createdAt: string;
     }
 
-    let events: Event[] = [];
+    let events: Event[] = $state([]);
 
     onMount(async () => {
         // Try to get events from localStorage first

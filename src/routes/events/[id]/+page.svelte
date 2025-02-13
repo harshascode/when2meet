@@ -41,32 +41,32 @@
 	// ========== State Management ==========
 	const eventId = $page.params.id;
 
-	let event: Event | null = null;
-	let loading = true;
-	let error: string | null = null;
+	let event: Event | null = $state(null);
+	let loading = $state(true);
+	let error: string | null = $state(null);
 
-	let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-	let participantName = '';
-	let availability: Availability = {};
+	let timezone = $state(Intl.DateTimeFormat().resolvedOptions().timeZone);
+	let participantName = $state('');
+	let availability: Availability = $state({});
 
-	let participants: Participant[] = [];
-	let selectedParticipant: Participant | null = null;
+	let participants: Participant[] = $state([]);
+	let selectedParticipant: Participant | null = $state(null);
 
 	let isDragging = false;
-	let nameError = false;
-	let mouseX = 0;
-	let mouseY = 0;
+	let nameError = $state(false);
+	let mouseX = $state(0);
+	let mouseY = $state(0);
 
 	// Add these after the existing state variables
-	let password = '';
-	let confirmPassword = '';
-	let showPasswordFields = true; // Always show password fields
-	let passwordError = '';
+	let password = $state('');
+	let confirmPassword = $state('');
+	let showPasswordFields = $state(true); // Always show password fields
+	let passwordError = $state('');
 	let isEditing = false;
-	let isLoggedIn = false; // Track login status
-	let loginPassword = ''; // Password for login
-	let loginError = ''; // Error message for login
-	let isNewUser = false; // Track if the user is new
+	let isLoggedIn = $state(false); // Track login status
+	let loginPassword = $state(''); // Password for login
+	let loginError = $state(''); // Error message for login
+	let isNewUser = $state(false); // Track if the user is new
 
 	let dragSelection = {
 		start: null as { date: string; timeSlot: string } | null,
@@ -74,7 +74,7 @@
 	};
 
 	// This hoveredCell will only be set by the group availability grid cells.
-	let hoveredCell: { date: string; timeSlot: string } | null = null;
+	let hoveredCell: { date: string; timeSlot: string } | null = $state(null);
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// ========== Constants ==========
