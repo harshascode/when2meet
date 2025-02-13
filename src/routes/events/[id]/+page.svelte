@@ -11,7 +11,7 @@
 		timezone: string;
 		availability: Availability;
 		lastUpdated: string;
-		hasPassword?: string; // Store the hashed password
+		hasPassword?: string;
 	}
 
 	interface Response {
@@ -29,15 +29,23 @@
 		responses: Response[];
 	}
 
+	interface AuthResponse {
+		success: boolean;
+		token?: string;
+		message: string;
+		error?: string;
+	}
+
 	// ========== Imports ==========
-	import { page } from '$app/state';
+	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
 	import Footer from '$lib/Footer.svelte';
 	import Header from '$lib/Header.svelte';
+	import { browser } from '$app/environment';
 
 	// ========== State Management ==========
-	const eventId = page.params.id;
+	const eventId = $page.params.id;
 
 	let event: Event | null = $state(null);
 	let loading = $state(true);
@@ -55,48 +63,131 @@
 	let mouseX = $state(0);
 	let mouseY = $state(0);
 
-	// Add these after the existing state variables
+	// Auth related state
+	let token = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
-	let showPasswordFields = $state(true); // Always show password fields
+	let showPasswordFields = $state(true);
 	let passwordError = $state('');
 	let isEditing = $state(false);
-	let editingPassword = $state('');
-	let existingParticipantPassword = $state(''); // Store existing password hash
-	let isLoggedIn = $state(false); // Track login status
-	let loginPassword = $state(''); // Password for login
-	let loginError = $state(''); // Error message for login
-	let isNewUser = $state(false); // Track if the user is new
+	let loginError = $state('');
+	let isLoggedIn = $state(false);
+	let loginPassword = $state('');
+	let isNewUser = $state(false);
 
 	let dragSelection = $state<{
 		start: { date: string; timeSlot: string } | null;
 		end: { date: string; timeSlot: string } | null;
 	}>({ start: null, end: null });
 
-	// This hoveredCell will only be set by the group availability grid cells.
 	let hoveredCell = $state<{ date: string; timeSlot: string } | null>(null);
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = $state(null);
 
 	// ========== Constants ==========
 	const timezones = Intl.supportedValuesOf('timeZone');
+	const initialTouchX = 0;
+	const initialTouchY = 0;
+	const touchMoveThreshold = 10;
+
+	// ========== Authentication Functions ==========
+	async function handleSignIn() {
+		nameError = false;
+		loginError = '';
+
+		if (!participantName) {
+			nameError = true;
+			return;
+		}
+
+		try {
+			const response = await fetch(`/api/events/${eventId}/responses`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					action: 'login',
+					participantName,
+					loginPassword,
+					password: isNewUser ? password : undefined
+				})
+			});
+
+			const data: AuthResponse = await response.json();
+
+			if (response.ok && data.token) {
+				token = data.token;
+				if (browser) {
+					localStorage.setItem('authToken', token);
+				}
+				isLoggedIn = true;
+				loginError = '';
+				await refreshEventData();
+			} else {
+				loginError = data.error || 'Error signing in';
+				isLoggedIn = false;
+			}
+		} catch (error) {
+			console.error('Error signing in:', error);
+			loginError = 'Error signing in';
+			isLoggedIn = false;
+		}
+	}
+
+	function handleSignOut() {
+		isLoggedIn = false;
+		participantName = '';
+		password = '';
+		confirmPassword = '';
+		loginPassword = '';
+		showPasswordFields = true;
+		availability = {};
+		token = '';
+		if (browser) {
+			localStorage.removeItem('authToken');
+		}
+		initializeAvailability();
+	}
+
+	async function verifyToken() {
+		if (!token) return false;
+
+		try {
+			const response = await fetch(`/api/events/${eventId}/verify`, {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${token}`,
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (!response.ok) {
+				handleSignOut();
+				return false;
+			}
+
+			return true;
+		} catch (error) {
+			handleSignOut();
+			return false;
+		}
+	}
 
 	// ========== Event Handlers ==========
-	function handleCellClick(date: string, timeSlot: string) {
+	async function handleCellClick(date: string, timeSlot: string) {
 		if (!isLoggedIn) {
 			alert('Please sign in to select availability.');
 			return;
 		}
+
 		const currentState = availability[date]?.[timeSlot] || false;
-		availability[date] = availability[date] || {}; // Ensure date exists
+		availability[date] = availability[date] || {};
 		availability[date][timeSlot] = !currentState;
-		saveAvailability();
+		await saveAvailability();
 	}
 
 	function handleDrag(date: string, timeSlot: string) {
-		if (!isLoggedIn) {
-			return;
-		}
-		if (!isDragging || !participantName) return;
+		if (!isLoggedIn || !isDragging || !participantName) return;
 		dragSelection.end = { date, timeSlot };
 	}
 
@@ -108,108 +199,6 @@
 		}
 	}
 
-	function globalStopDrag() {
-		stopDrag();
-	}
-
-	function startDrag(date: string, timeSlot: string) {
-		if (!isLoggedIn) {
-			return;
-		}
-		if (!participantName) {
-			nameError = true;
-			const nameInput = document.getElementById('participantName');
-			nameInput?.focus();
-			return;
-		}
-
-		if (!isMobileDevice()) {
-			isDragging = true;
-			dragSelection.start = { date, timeSlot };
-			dragSelection.end = { date, timeSlot };
-			window.addEventListener('mouseup', globalStopDrag);
-		}
-	}
-
-	function handleTouchStart(e: TouchEvent, date: string, timeSlot: string) {
-		if (!isLoggedIn) {
-			return;
-		}
-		if (!participantName) {
-			nameError = true;
-			const nameInput = document.getElementById('participantName');
-			nameInput?.focus();
-			return;
-		}
-
-		const touch = e.touches[0];
-		initialTouchX = touch.clientX;
-		initialTouchY = touch.clientY;
-	}
-
-	function handleTouchMove(e: TouchEvent, date: string, timeSlot: string) {
-		const touch = e.touches[0];
-		const deltaX = Math.abs(touch.clientX - initialTouchX);
-		const deltaY = Math.abs(touch.clientY - initialTouchY);
-
-		if (deltaX > touchMoveThreshold || deltaY > touchMoveThreshold) return;
-		if (!isDragging) return;
-
-		const target = document.elementFromPoint(touch.clientX, touch.clientY);
-		if (target?.closest('button')) {
-			handleDrag(date, timeSlot);
-		}
-	}
-
-	function handleTouchEnd(e: TouchEvent, date: string, timeSlot: string) {
-		const touch = e.touches[0];
-		const deltaX = Math.abs(touch.clientX - initialTouchX);
-		const deltaY = Math.abs(touch.clientY - initialTouchY);
-
-		if (deltaX <= touchMoveThreshold && deltaY <= touchMoveThreshold) {
-			const currentState = availability[date]?.[timeSlot] || false;
-			availability[date] = availability[date] || {}; // Ensure date exists
-			availability[date][timeSlot] = !currentState;
-			saveAvailability();
-		}
-		stopDrag();
-	}
-
-	function viewParticipantAvailability(participant: Participant): void {
-		selectedParticipant = participant;
-	}
-
-	// ========== Utility Functions ==========
-	function trackMousePosition(event: MouseEvent) {
-		mouseX = event.clientX;
-		mouseY = event.clientY;
-	}
-
-	function isMobileDevice(): boolean {
-		return /Mobi|Android/i.test(navigator.userAgent);
-	}
-
-	function formatDate(dateStr: string): string {
-		return format(new Date(dateStr), 'MMM d\nEEE');
-	}
-
-	function formatDateTime(dateStr: string): string {
-		return new Date(dateStr).toLocaleString();
-	}
-
-	// These functions are used only for the group availability grid.
-	function handleCellHover(date: string, timeSlot: string) {
-		if (hoverTimeout) clearTimeout(hoverTimeout);
-		hoverTimeout = setTimeout(() => (hoveredCell = { date, timeSlot }), 200);
-	}
-
-	function handleCellLeave() {
-		if (hoverTimeout) clearTimeout(hoverTimeout);
-		hoverTimeout = null;
-		hoveredCell = null;
-	}
-
-	// ========== Business Logic ==========
 	function updateDragSelection() {
 		if (!dragSelection.start || !dragSelection.end || !event) return;
 
@@ -236,7 +225,7 @@
 			for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
 				const date = dates[d];
 				const timeSlot = timeSlots[t];
-				availability[date] = availability[date] || {}; // Ensure date exists
+				availability[date] = availability[date] || {};
 				availability[date][timeSlot] = !currentState;
 			}
 		}
@@ -244,6 +233,89 @@
 		saveAvailability();
 		dragSelection.start = null;
 		dragSelection.end = null;
+	}
+
+	function globalStopDrag() {
+		stopDrag();
+	}
+
+	function startDrag(date: string, timeSlot: string) {
+		if (!isLoggedIn) return;
+
+		if (!participantName) {
+			nameError = true;
+			const nameInput = document.getElementById('participantName');
+			nameInput?.focus();
+			return;
+		}
+
+		if (!isMobileDevice()) {
+			isDragging = true;
+			dragSelection.start = { date, timeSlot };
+			dragSelection.end = { date, timeSlot };
+			window.addEventListener('mouseup', globalStopDrag);
+		}
+	}
+
+	async function handleNameInput() {
+		nameError = false;
+		showPasswordFields = true;
+		if (!participantName) return;
+
+		const existingParticipant = participants.find((p) => p.name === participantName);
+		if (existingParticipant) {
+			isNewUser = false;
+			isEditing = true;
+			passwordError = '';
+		} else {
+			isNewUser = true;
+			isEditing = false;
+			password = '';
+			confirmPassword = '';
+		}
+	}
+
+	function viewParticipantAvailability(participant: Participant): void {
+		selectedParticipant = participant;
+	}
+
+	// ========== Utility Functions ==========
+	function trackMousePosition(event: MouseEvent) {
+		mouseX = event.clientX;
+		mouseY = event.clientY;
+	}
+
+	function isMobileDevice(): boolean {
+		return browser ? /Mobi|Android/i.test(navigator.userAgent) : false;
+	}
+
+	function formatDate(dateStr: string): string {
+		return format(new Date(dateStr), 'MMM d\nEEE');
+	}
+
+	function formatDateTime(dateStr: string): string {
+		return new Date(dateStr).toLocaleString();
+	}
+
+	function isInDragSelection(date: string, timeSlot: string): boolean {
+		if (!dragSelection.start || !dragSelection.end || !event) return false;
+
+		const dates = event.dates;
+		const timeSlots = event.timeSlots;
+		const currentDateIdx = dates.indexOf(date);
+		const currentTimeIdx = timeSlots.indexOf(timeSlot);
+
+		const startDateIdx = dates.indexOf(dragSelection.start.date);
+		const endDateIdx = dates.indexOf(dragSelection.end.date);
+		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
+		const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
+
+		return (
+			currentDateIdx >= Math.min(startDateIdx, endDateIdx) &&
+			currentDateIdx <= Math.max(startDateIdx, endDateIdx) &&
+			currentTimeIdx >= Math.min(startTimeIdx, endTimeIdx) &&
+			currentTimeIdx <= Math.max(startTimeIdx, endTimeIdx)
+		);
 	}
 
 	function getGroupAvailability(date: string, timeSlot: string): number {
@@ -291,33 +363,24 @@
 		return participant?.availability?.[date]?.[timeSlot] || false;
 	}
 
-	function isInDragSelection(date: string, timeSlot: string): boolean {
-		if (!dragSelection.start || !dragSelection.end || !event) return false;
+	function handleCellHover(date: string, timeSlot: string) {
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoverTimeout = setTimeout(() => (hoveredCell = { date, timeSlot }), 200);
+	}
 
-		const dates = event.dates;
-		const timeSlots = event.timeSlots;
-		const currentDateIdx = dates.indexOf(date);
-		const currentTimeIdx = timeSlots.indexOf(timeSlot);
-
-		const startDateIdx = dates.indexOf(dragSelection.start.date);
-		const endDateIdx = dates.indexOf(dragSelection.end.date);
-		const startTimeIdx = timeSlots.indexOf(dragSelection.start.timeSlot);
-		const endTimeIdx = timeSlots.indexOf(dragSelection.end.timeSlot);
-
-		return (
-			currentDateIdx >= Math.min(startDateIdx, endDateIdx) &&
-			currentDateIdx <= Math.max(startDateIdx, endDateIdx) &&
-			currentTimeIdx >= Math.min(startTimeIdx, endTimeIdx) &&
-			currentTimeIdx <= Math.max(startTimeIdx, endTimeIdx)
-		);
+	function handleCellLeave() {
+		if (hoverTimeout) clearTimeout(hoverTimeout);
+		hoverTimeout = null;
+		hoveredCell = null;
 	}
 
 	// ========== API Interactions ==========
 	async function saveAvailability() {
-		if (!isLoggedIn) {
+		if (!isLoggedIn || !token) {
 			alert('Please sign in to save availability.');
 			return;
 		}
+
 		if (!participantName) {
 			nameError = true;
 			return;
@@ -326,20 +389,21 @@
 		try {
 			const response = await fetch(`/api/events/${eventId}/responses`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`
+				},
 				body: JSON.stringify({
 					participantName,
 					availability,
-					timezone,
-					password, // Send plain text password
-					editingPassword // Send plain text editing password
+					timezone
 				})
 			});
 
 			if (!response.ok) {
-				const error = await response.json();
-				if (error.type === 'password_required') {
-					passwordError = 'Incorrect password';
+				if (response.status === 401) {
+					handleSignOut();
+					alert('Session expired. Please sign in again.');
 					return;
 				}
 				throw new Error('Failed to save availability');
@@ -347,35 +411,20 @@
 
 			showSuccessFeedback();
 			await refreshEventData();
-
-			// Reset password fields after successful save
-			if (!isEditing) {
-				password = '';
-				confirmPassword = '';
-			}
-			editingPassword = ''; // clear editing password after save whether success or not
-			passwordError = '';
-		} catch (error: unknown) {
+		} catch (error) {
 			handleSaveError(error);
 		}
 	}
 
-	// ========== UI Helpers ==========
-	function showSuccessFeedback() {
-		const successMessage = document.createElement('div');
-		successMessage.className =
-			'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
-		successMessage.textContent = 'Availability saved successfully!';
-		document.body.appendChild(successMessage);
-		setTimeout(() => successMessage.remove(), 3000);
-	}
-
-	// ========== Data Management ==========
 	async function refreshEventData() {
-		const eventResponse = await fetch(`/api/events/${eventId}`);
-		if (eventResponse.ok) {
-			event = (await eventResponse.json()) as Event;
+		try {
+			const response = await fetch(`/api/events/${eventId}`);
+			if (!response.ok) throw new Error('Event not found');
+
+			event = (await response.json()) as Event;
 			updateParticipants();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load event';
 		}
 	}
 
@@ -391,7 +440,7 @@
 				timezone: response.timezone,
 				availability: {},
 				lastUpdated: response.created_at,
-				hasPassword: undefined // Initialize hasPassword as undefined, will be populated later
+				hasPassword: undefined
 			};
 
 			participant.availability[response.date] = participant.availability[response.date] || {};
@@ -399,36 +448,33 @@
 			participantMap.set(response.participant_name, participant);
 		});
 
-		// Fetch participant data to get password hash
 		participants = Array.from(participantMap.values()).sort(
 			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
 		);
-		fetchParticipantData(); // Call function to fetch and update participant data with passwords
+		fetchParticipantData();
 	}
 
 	async function fetchParticipantData() {
 		if (!event) return;
 		try {
-			const response = await fetch(`/api/events/${eventId}/participants`); // Assuming new endpoint to fetch all participant data including passwords
+			const response = await fetch(`/api/events/${eventId}/participants`);
 			if (!response.ok) throw new Error('Failed to fetch participant data');
-			const participantData = await response.json(); // Expecting array of participant objects with hashed passwords
+			const participantData = await response.json();
 
 			const participantMap = new Map<string, Participant>();
 			participantData.forEach((data: Participant) => {
-				// Iterate over fetched participant data
-				participantMap.set(data.name, data); // Map by name for easy lookup
+				participantMap.set(data.name, data);
 			});
 
 			participants = participants.map((p) => {
-				// Update existing participants array with password info
 				const participantFromData = participantMap.get(p.name);
 				if (participantFromData) {
-					return { ...p, hasPassword: participantFromData.hasPassword }; // Merge existing participant with password info
+					return { ...p, hasPassword: participantFromData.hasPassword };
 				}
-				return p; // Return original if no password info found (shouldn't happen if API works correctly)
+				return p;
 			});
 		} catch (error) {
-			console.error('Error fetching participant passwords:', error); // Log error but don't block UI
+			console.error('Error fetching participant passwords:', error);
 		}
 	}
 
@@ -438,30 +484,14 @@
 		alert(message);
 	}
 
-	// ========== Lifecycle Hooks ==========
-	onMount(async () => {
-		// Reset password-related state
-		isEditing = false;
-		showPasswordFields = true; // Always show password field
-		password = '';
-		confirmPassword = '';
-		editingPassword = '';
-		passwordError = '';
-		existingParticipantPassword = '';
-
-		try {
-			const response = await fetch(`/api/events/${eventId}`);
-			if (!response.ok) throw new Error('Event not found');
-
-			event = (await response.json()) as Event;
-			initializeAvailability();
-			updateParticipants(); // Initialize and fetch participant data on mount
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to load event';
-		} finally {
-			loading = false;
-		}
-	});
+	function showSuccessFeedback() {
+		const successMessage = document.createElement('div');
+		successMessage.className =
+			'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
+		successMessage.textContent = 'Availability saved successfully!';
+		document.body.appendChild(successMessage);
+		setTimeout(() => successMessage.remove(), 3000);
+	}
 
 	function initializeAvailability() {
 		event?.dates.forEach((date) => {
@@ -472,111 +502,33 @@
 		});
 	}
 
-	async function handleNameInput() {
-		nameError = false;
-		showPasswordFields = true; // Always show password fields
-		if (!participantName) return;
-
-		const existingParticipant = participants.find((p) => p.name === participantName);
-		if (existingParticipant) {
-			isNewUser = false;
-			isEditing = true;
-			passwordError = '';
-			existingParticipantPassword = existingParticipant.hasPassword || ''; // Store existing password
-		} else {
-			isNewUser = true;
-			isEditing = false;
-			password = '';
-			confirmPassword = '';
-			existingParticipantPassword = '';
-		}
-	}
-
-	async function handleSignIn() {
-		nameError = false;
-		loginError = '';
-
-		if (!participantName) {
-			nameError = true;
-			return;
+	// ========== Lifecycle Hooks ==========
+	onMount(async () => {
+		if (browser) {
+			token = localStorage.getItem('authToken') || '';
+			isLoggedIn = !!token;
 		}
 
-		const existingParticipant = participants.find((p) => p.name === participantName);
-
-		if (existingParticipant) {
-			isNewUser = false;
-			if (existingParticipant.hasPassword) {
-				if (!loginPassword) {
-					loginError = 'Password is required for this participant.';
-					isLoggedIn = false;
-					return;
-				}
-
-				try {
-					const response = await fetch(`/api/events/${eventId}/responses`, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json'
-						},
-						body: JSON.stringify({
-							participantName: participantName,
-							loginPassword: loginPassword,
-							verifyPassword: true // Indicate password verification
-						})
-					});
-
-					if (response.ok) {
-						// **Move isLoggedIn setting here, after successful verification**
-						isLoggedIn = true;
-						loginError = '';
-						await refreshEventData(); // Refresh data after successful sign-in
-					} else {
-						const errorData = await response.json();
-						loginError = errorData.error || 'Incorrect password';
-						isLoggedIn = false;
-					}
-				} catch (error) {
-					console.error('Error verifying password:', error);
-					loginError = 'Error verifying password';
-					isLoggedIn = false;
-				}
-			} else {
-				// No password required, sign in directly
-				isLoggedIn = true;
-				loginError = '';
-				await refreshEventData(); // Refresh data after successful sign-in
+		if (token) {
+			const isValid = await verifyToken();
+			if (!isValid) {
+				handleSignOut();
 			}
-		} else {
-			// New user, no password needed for initial sign-in, password creation is optional on save.
-			isNewUser = true;
-			isLoggedIn = true;
-			loginError = '';
-			await refreshEventData(); // Refresh data after successful sign-in
 		}
 
-		console.log('SignIn Status:', {
-			participantName,
-			isLoggedIn,
-			loginError,
-			hasPassword: existingParticipant?.hasPassword ? true : false
-		});
-	}
+		try {
+			const response = await fetch(`/api/events/${eventId}`);
+			if (!response.ok) throw new Error('Event not found');
 
-	function handleSignOut() {
-		isLoggedIn = false;
-		participantName = '';
-		password = '';
-		confirmPassword = '';
-		loginPassword = '';
-		showPasswordFields = true; // Keep showing password fields on sign out as per requirement
-		availability = {};
-		initializeAvailability();
-	}
-
-	// ========== Drag Constants ==========
-	let initialTouchX = 0;
-	let initialTouchY = 0;
-	const touchMoveThreshold = 10;
+			event = (await response.json()) as Event;
+			initializeAvailability();
+			updateParticipants();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load event';
+		} finally {
+			loading = false;
+		}
+	});
 </script>
 
 <div
@@ -651,14 +603,14 @@
 															for="loginPassword"
 															class="mb-1 block text-sm font-medium text-gray-700"
 														>
-															Password (Optional if not set before)
+															Password
 														</label>
 														<input
 															type="password"
 															id="loginPassword"
 															bind:value={loginPassword}
 															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Enter your password if set"
+															placeholder="Enter your password"
 														/>
 													</div>
 												{:else}
@@ -674,27 +626,29 @@
 															id="password"
 															bind:value={password}
 															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Create a password if you want"
+															placeholder="Create a password"
 														/>
 													</div>
-													<div>
-														<label
-															for="confirmPassword"
-															class="mb-1 block text-sm font-medium text-gray-700"
-														>
-															Confirm Password (Optional, Required if creating password)
-														</label>
-														<input
-															type="password"
-															id="confirmPassword"
-															bind:value={confirmPassword}
-															class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-															placeholder="Confirm your password if creating one"
-														/>
-													</div>
-													{#if passwordError}
-														<p class="text-sm text-red-600">{passwordError}</p>
+													{#if password}
+														<div>
+															<label
+																for="confirmPassword"
+																class="mb-1 block text-sm font-medium text-gray-700"
+															>
+																Confirm Password
+															</label>
+															<input
+																type="password"
+																id="confirmPassword"
+																bind:value={confirmPassword}
+																class="w-full rounded border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+																placeholder="Confirm your password"
+															/>
+														</div>
 													{/if}
+												{/if}
+												{#if passwordError}
+													<p class="text-sm text-red-600">{passwordError}</p>
 												{/if}
 											</div>
 										{/if}
@@ -716,6 +670,7 @@
 											Signed in as: <span class="font-medium">{participantName}</span>
 										</p>
 										<div>
+											<!-- svelte-ignore a11y_label_has_associated_control -->
 											<label class="mb-1 block text-sm font-medium text-gray-700">Time Zone</label>
 											<select
 												bind:value={timezone}
@@ -830,9 +785,7 @@
 															onmousedown={() => startDrag(date, timeSlot)}
 															onmouseenter={() => handleDrag(date, timeSlot)}
 															onmouseup={stopDrag}
-															ontouchstart={(e) => handleTouchStart(e, date, timeSlot)}
-															ontouchmove={(e) => handleTouchMove(e, date, timeSlot)}
-															ontouchend={(e) => handleTouchEnd(e, date, timeSlot)}
+															onclick={() => handleCellClick(date, timeSlot)}
 														>
 															<div class="pointer-events-none h-full w-full">
 																{#if isInDragSelection(date, timeSlot)}
@@ -848,7 +801,7 @@
 								</div>
 							</div>
 
-							<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<div class="mb-6 flex flex-col items-center justify-between sm:flex-row">
 									<h2 class="text-lg font-semibold text-gray-900">
 										Group Availability ({event?.responses?.length || 0})
@@ -886,6 +839,7 @@
 														{timeSlot}
 													</div>
 													{#each event?.dates || [] as date}
+														<!-- svelte-ignore a11y_mouse_events_have_key_events -->
 														<div
 															class="h-10 border-b border-r border-gray-200"
 															style="background-color: rgba(34, 197, 94, {getGroupAvailability(
@@ -981,10 +935,7 @@
 					</div>
 					<div class="overflow-x-auto pb-2">
 						<div class="inline-block min-w-full align-middle">
-							<div
-								class="
-overflow-hidden rounded-lg border border-gray-200"
-							>
+							<div class="overflow-hidden rounded-lg border border-gray-200">
 								<div
 									class="grid bg-white"
 									style="grid-template-columns: 60px repeat({event?.dates?.length ||
@@ -998,7 +949,6 @@ overflow-hidden rounded-lg border border-gray-200"
 											{formatDate(date)}
 										</div>
 									{/each}
-
 									{#each event?.timeSlots || [] as timeSlot}
 										<div
 											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
@@ -1007,7 +957,7 @@ overflow-hidden rounded-lg border border-gray-200"
 										</div>
 										{#each event?.dates || [] as date}
 											<div
-												class="h-10 border-b border-r border-gray-200"
+												class="h-10 border-b border-r border-gray-200 transition-colors duration-75"
 												class:bg-green-500={getParticipantAvailability(
 													selectedParticipant,
 													date,
@@ -1025,6 +975,9 @@ overflow-hidden rounded-lg border border-gray-200"
 							</div>
 						</div>
 					</div>
+					<div class="mt-6 text-center text-sm text-gray-500">
+						Last updated: {formatDateTime(selectedParticipant.lastUpdated)}
+					</div>
 				</div>
 			</div>
 		{/if}
@@ -1032,28 +985,3 @@ overflow-hidden rounded-lg border border-gray-200"
 
 	<Footer />
 </div>
-
-<!-- Additional Styles for Responsiveness -->
-<style>
-	/* Custom media queries for fine tuning if needed */
-	@media (max-width: 640px) {
-		/* For small mobile devices */
-		main {
-			padding: 1rem;
-		}
-	}
-
-	@media (min-width: 641px) and (max-width: 1024px) {
-		/* For iPad/tablet devices */
-		main {
-			padding: 1.5rem;
-		}
-	}
-
-	@media (min-width: 1025px) {
-		/* For desktop devices, if any extra rules are needed */
-		main {
-			padding: 2rem;
-		}
-	}
-</style>
