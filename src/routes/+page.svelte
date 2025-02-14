@@ -398,152 +398,204 @@
 </script>
 
 <!-- MAIN MARKUP -->
-<div class="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+<div class="min-h-screen bg-gradient-to-b from-slate-50 to-white">
 	<Header />
 
-	<main class="container mx-auto max-w-6xl px-4 py-5">
-		<!-- Event Name Input -->
-		<div class="mx-auto mb-6 max-w-2xl">
-			<input
-				type="text"
-				placeholder="Enter event name"
-				class="w-full rounded-lg border {showEventNameError
-					? 'border-red-500'
-					: 'border-gray-300'} bg-white px-6 py-4 text-center font-medium text-gray-900 placeholder-gray-400 transition-all"
-				bind:value={eventName}
-				oninput={() => (showEventNameError = false)}
-			/>
-			{#if showEventNameError}
-				<p class="mt-2 text-center text-sm text-red-600">Please enter an event name</p>
-			{/if}
+	<main class="container mx-auto max-w-6xl px-4 py-8">
+		<!-- Professional Header -->
+		<div class="mb-12 text-center">
+			<h1 class="mb-3 text-3xl font-semibold text-slate-800 md:text-4xl">Schedule Your Event</h1>
+			<p class="mx-auto max-w-2xl text-base text-slate-600">
+				Select dates and times to find the perfect meeting slot
+			</p>
 		</div>
 
-		<div class="flex flex-col justify-center gap-16 md:flex-row">
-			<!-- NEW CALENDAR COMPONENT (with current date highlighted) -->
-			<div class="shadow-xs h-fit rounded-lg border border-gray-200 bg-white p-4 md:w-80">
-				<div class="calendar-container">
-					<div class="calendar-header">
-						<button class="nav-button" onclick={prevMonth} aria-label="Previous Month">&lt;</button>
-						<h2>{getMonthName(currentYear, currentMonth)} {currentYear}</h2>
-						<button class="nav-button" onclick={nextMonth} aria-label="Next Month">&gt;</button>
-					</div>
-					<div
-						class="calendar"
-						role="grid"
-						tabindex="0"
-						aria-label="Calendar Selection Grid"
-						onmousemove={handleMouseMove}
-					>
-						<!-- Weekday header row -->
-						{#each days as day}
-							<div class="cell header">{day}</div>
-						{/each}
-						<!-- Calendar date cells -->
-						{#each grid as row}
-							{#each row as cell}
-								<div
-									class="cell {cell.selected ? 'selected' : ''} {cell.inCurrentMonth
-										? ''
-										: 'other-month'} {isDragging &&
-									dragRange &&
-									cell.row >= dragRange.minRow &&
-									cell.row <= dragRange.maxRow &&
-									cell.col >= dragRange.minCol &&
-									cell.col <= dragRange.maxCol
-										? dragMode === 'select'
-											? 'drag-select'
-											: 'drag-deselect'
-										: ''} {isToday(cell) ? 'today' : ''}"
-									data-row={cell.row}
-									data-col={cell.col}
-									role="gridcell"
-									tabindex="0"
-									aria-selected={cell.selected}
-									aria-label={`Select ${cell.date}`}
-									onmousedown={(e) => handleMouseDown(cell, e)}
-									onclick={() => toggleCell(cell)}
+		<!-- Event Creation Section -->
+		<div class="mx-auto max-w-5xl rounded-md p-6">
+			<!-- Event Name Input -->
+			<div class="mx-auto mb-8 max-w-2xl">
+				<input
+					type="text"
+					placeholder="Event name"
+					class="w-full rounded-sm border {showEventNameError
+						? 'border-red-500'
+						: 'border-slate-300'} bg-white px-4 py-3 text-center font-medium text-slate-900 placeholder-slate-400 shadow-sm transition-all focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+					bind:value={eventName}
+					oninput={() => (showEventNameError = false)}
+				/>
+				{#if showEventNameError}
+					<p class="mt-2 text-center text-sm text-red-600">Please enter an event name</p>
+				{/if}
+			</div>
+
+			<div class="flex flex-col justify-center gap-6 md:flex-row md:gap-8">
+				<!-- Calendar Component -->
+				<div class="h-fit rounded-sm border border-slate-200 bg-white p-5 shadow-sm md:w-[400px]">
+					<div class="calendar-container">
+						<div class="calendar-header mb-4">
+							<button class="nav-button" onclick={prevMonth} aria-label="Previous Month">
+								<svg
+									class="h-5 w-5 text-slate-600"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
 								>
-									{cell.date}
-								</div>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M15 19l-7-7 7-7"
+									/>
+								</svg>
+							</button>
+							<h2 class="text-lg font-medium text-slate-800">
+								{getMonthName(currentYear, currentMonth)}
+								{currentYear}
+							</h2>
+							<button class="nav-button" onclick={nextMonth} aria-label="Next Month">
+								<svg
+									class="h-5 w-5 text-slate-600"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 5l7 7-7 7"
+									/>
+								</svg>
+							</button>
+						</div>
+						<div
+							class="calendar"
+							role="grid"
+							tabindex="0"
+							aria-label="Calendar Selection Grid"
+							onmousemove={handleMouseMove}
+						>
+							{#each days as day}
+								<div class="cell header">{day}</div>
 							{/each}
+							{#each grid as row}
+								{#each row as cell}
+									<div
+										class="cell {cell.selected ? 'selected' : ''} {cell.inCurrentMonth
+											? ''
+											: 'other-month'} 
+                                        {isDragging &&
+										dragRange &&
+										cell.row >= dragRange.minRow &&
+										cell.row <= dragRange.maxRow &&
+										cell.col >= dragRange.minCol &&
+										cell.col <= dragRange.maxCol
+											? dragMode === 'select'
+												? 'drag-select'
+												: 'drag-deselect'
+											: ''} 
+                                        {isToday(cell) ? 'today' : ''}"
+										data-row={cell.row}
+										data-col={cell.col}
+										role="gridcell"
+										tabindex="0"
+										aria-selected={cell.selected}
+										aria-label={`Select ${cell.date}`}
+										onmousedown={(e) => handleMouseDown(cell, e)}
+										onclick={() => toggleCell(cell)}
+									>
+										{cell.date}
+									</div>
+								{/each}
+							{/each}
+						</div>
+					</div>
+				</div>
+
+				<!-- Time Selection Panel -->
+				<div class="flex-1 rounded-sm border border-slate-200 bg-white p-5 shadow-sm">
+					<div class="mb-6 grid grid-cols-2 gap-4">
+						<div>
+							<label for="startTime" class="mb-1.5 block text-sm font-medium text-slate-700"
+								>Start Time</label
+							>
+							<select
+								id="startTime"
+								bind:value={startTime}
+								class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+							>
+								{#each timeSlots as timeOption}
+									<option value={timeOption.time}>{timeOption.formatted}</option>
+								{/each}
+							</select>
+						</div>
+						<div>
+							<label for="endTime" class="mb-1.5 block text-sm font-medium text-slate-700"
+								>End Time</label
+							>
+							<select
+								id="endTime"
+								bind:value={endTime}
+								class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+							>
+								{#each timeSlots as timeOption}
+									<option value={timeOption.time}>{timeOption.formatted}</option>
+								{/each}
+							</select>
+						</div>
+					</div>
+
+					<div class="mb-6">
+						<label for="timezone" class="mb-1.5 block text-sm font-medium text-slate-700"
+							>Time Zone</label
+						>
+						<select
+							id="timezone"
+							bind:value={selectedTimeZone}
+							class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+						>
+							{#each timeZones as tz}
+								<option value={tz.value}>{tz.label}</option>
+							{/each}
+						</select>
+					</div>
+
+					<div
+						class="grid max-h-[280px] grid-cols-3 gap-1.5 overflow-y-auto rounded-sm border border-slate-200 bg-slate-50 p-2"
+					>
+						{#each timeSlots as timeSlot (timeSlot.time)}
+							<button
+								class="rounded-sm px-2 py-2 text-xs font-medium transition-colors {selectedTimes.includes(
+									timeSlot.time
+								)
+									? 'bg-slate-800 text-white'
+									: 'bg-white text-slate-700 hover:bg-slate-100'}"
+								onclick={() => toggleTimeSelection(timeSlot.time)}
+							>
+								{timeSlot.formatted}
+							</button>
 						{/each}
 					</div>
 				</div>
 			</div>
 
-			<!-- TIME SELECTION PANEL (unchanged) -->
-			<div class="shadow-xs w-96 rounded-lg border border-gray-200 bg-white p-6">
-				<div class="mb-6 grid grid-cols-2 gap-4">
-					<div>
-						<label for="startTime" class="mb-2 block text-sm font-medium text-gray-700"
-							>Start Time</label
-						>
-						<select
-							id="startTime"
-							bind:value={startTime}
-							class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-						>
-							{#each timeSlots as timeOption}
-								<option value={timeOption.time}>{timeOption.formatted}</option>
-							{/each}
-						</select>
-					</div>
-					<div>
-						<label for="endTime" class="mb-2 block text-sm font-medium text-gray-700"
-							>End Time</label
-						>
-						<select
-							id="endTime"
-							bind:value={endTime}
-							class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-						>
-							{#each timeSlots as timeOption}
-								<option value={timeOption.time}>{timeOption.formatted}</option>
-							{/each}
-						</select>
-					</div>
-				</div>
-
-				<div class="mb-6">
-					<label for="timezone" class="mb-2 block text-sm font-medium text-gray-700"
-						>Time Zone</label
-					>
-					<select
-						id="timezone"
-						bind:value={selectedTimeZone}
-						class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-					>
-						{#each timeZones as tz}
-							<option value={tz.value}>{tz.label}</option>
-						{/each}
-					</select>
-				</div>
-
-				<div class="grid max-h-[360px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
-					{#each timeSlots as timeSlot (timeSlot.time)}
-						<button
-							class="rounded-sm px-3 py-2 text-xs font-medium transition-colors {selectedTimes.includes(
-								timeSlot.time
-							)
-								? 'bg-blue-600 text-white hover:bg-blue-700'
-								: 'bg-gray-50 text-gray-700 hover:bg-gray-100'}"
-							onclick={() => toggleTimeSelection(timeSlot.time)}
-						>
-							{timeSlot.formatted}
-						</button>
-					{/each}
-				</div>
+			<div class="mt-8 text-center">
+				<button
+					onclick={handleSubmit}
+					class="inline-flex items-center rounded-sm bg-slate-800 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50"
+					disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
+				>
+					Create Event
+					<svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M13 7l5 5m0 0l-5 5m5-5H6"
+						/>
+					</svg>
+				</button>
 			</div>
-		</div>
-
-		<div class="mt-8 text-center">
-			<button
-				onclick={handleSubmit}
-				class="rounded-md bg-blue-600 px-8 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-				disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
-			>
-				Create Event
-			</button>
 		</div>
 	</main>
 
@@ -553,87 +605,77 @@
 <style>
 	/* CALENDAR STYLES */
 	.calendar-container {
-		max-width: 350px;
-		margin: 0 auto;
-		font-family: sans-serif;
+		width: 100%;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 	.calendar-header {
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
-		margin-bottom: 10px;
 	}
 	.nav-button {
-		background: none;
-		border: none;
-		font-size: 1.5rem;
-		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		transition: background-color 0.2s;
+	}
+	.nav-button:hover {
+		background-color: #f8fafc;
 	}
 	.calendar {
 		display: grid;
 		grid-template-columns: repeat(7, 1fr);
-		gap: 2px;
+		gap: 1px;
 		user-select: none;
-		padding: 5px;
-		background-color: #ddd;
+		padding: 1px;
+		background-color: #e2e8f0;
 	}
 	.cell {
-		height: 40px;
+		height: 38px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		background-color: white;
-		border: 1px solid #ccc;
+		font-size: 0.875rem;
+		border: 1px solid transparent;
 		cursor: pointer;
 		position: relative;
-		transition:
-			background-color 0.2s,
-			border 0.2s;
+		transition: all 0.15s;
 	}
+	/* .cell:hover:not(.header) {
+        background-color: #f8fafc;
+    } */
 	.header {
-		font-weight: bold;
-		background-color: #f0f0f0;
+		font-weight: 500;
+		color: #475569;
+		background-color: #f8fafc;
 		cursor: default;
 	}
 	.selected {
-		background-color: #10b981;
+		background-color: #1e293b;
 		color: white;
+	}
+	.selected:hover {
+		background-color: #334155;
 	}
 	.other-month {
-		opacity: 0.5;
-	}
-	.drag-select,
-	.drag-deselect {
-		border: none;
+		color: #94a3b8;
 	}
 	.drag-select {
+		background-color: #1e293b;
 		color: white;
-		background-color: #10b981;
 	}
 	.drag-deselect {
+		background-color: #f1f5f9;
 		color: black;
-		background-color: #efe7e7;
 	}
-	.drag-select::after,
-	.drag-deselect::after {
-		content: '';
-		position: absolute;
-		top: -1.5px;
-		left: -1.5px;
-		right: -1.5px;
-		bottom: -1.5px;
-		z-index: -1;
-		pointer-events: none;
+	.drag-deselect:hover {
+		background-color: #e1e7ed;
 	}
-	.drag-select::after {
-		background-color: #10b981;
-	}
-	.drag-deselect::after {
-		background-color: white;
-	}
-	/* Extra style for today's date */
 	.today {
-		font-weight: bold;
-		border: 1px solid green;
+		border: 1px solid #1e293b;
+		font-weight: 500;
 	}
 </style>
