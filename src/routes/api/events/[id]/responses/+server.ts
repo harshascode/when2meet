@@ -12,7 +12,7 @@ interface StoredPassword {
 
 export const POST: RequestHandler = async ({ params, request }) => {
 	try {
-		const { participantName, availability, timezone, password, action, loginPassword } =
+		const { participantName, binaryAvailability, timezone, password, action, loginPassword } =
 			await request.json();
 
 		// Authentication Logic
@@ -102,9 +102,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				token,
 				message: 'Logged in successfully'
 			});
-		}
+		 }
 
-		// Availability saving logic
+		// Verify auth token
 		const authHeader = request.headers.get('Authorization');
 		if (!authHeader?.startsWith('Bearer ')) {
 			return json({ error: 'Unauthorized' }, { status: 401 });
@@ -120,14 +120,22 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		// Delete existing responses
 		dbOperations.deleteParticipantResponses.run(params.id, participantName);
 
-		// Add new responses
-		for (const date in availability) {
-			for (const timeSlot in availability[date]) {
-				if (availability[date][timeSlot]) {
+		 // Get event dates and time slots
+		const eventDates = dbOperations.getEventDates.all(params.id);
+		const eventTimeSlots = dbOperations.getEventTimeSlots.all(params.id);
+		
+		// Process binary availability string
+		let index = 0;
+		eventDates.forEach((dateObj: any) => {
+			const date = dateObj.date;
+			eventTimeSlots.forEach((timeSlotObj: any) => {
+				const timeSlot = timeSlotObj.time_slot;
+				if (binaryAvailability[index] === '1') {
 					dbOperations.addResponse.run(params.id, participantName, date, timeSlot);
 				}
-			}
-		}
+				index++;
+			});
+		});
 
 		return json({
 			success: true,

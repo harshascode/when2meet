@@ -213,6 +213,7 @@
 		}
 	}
 
+	// Modify the updateDragSelection function for better performance
 	function updateDragSelection() {
 		if (!dragSelection.start || !dragSelection.end || !event) return;
 
@@ -232,18 +233,25 @@
 			Math.max(startTimeIdx, endTimeIdx)
 		];
 
-		const currentState =
-			availability[dragSelection.start.date]?.[dragSelection.start.timeSlot] || false;
-
+		// Get the initial state from the first cell
+		const currentState = availability[dates[minDateIdx]]?.[timeSlots[minTimeIdx]] || false;
+		
+		// Create a temporary binary string
+		let binaryString = convertToBinaryString(availability);
+		
+		// Update only the cells within the selection
 		for (let d = minDateIdx; d <= maxDateIdx; d++) {
 			for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
-				const date = dates[d];
-				const timeSlot = timeSlots[t];
-				availability[date] = availability[date] || {};
-				availability[date][timeSlot] = !currentState;
+				const index = (d * timeSlots.length) + t;
+				binaryString = binaryString.substring(0, index) + 
+							  (!currentState ? '1' : '0') + 
+							  binaryString.substring(index + 1);
 			}
 		}
-
+		
+		// Convert back to availability object
+		availability = convertFromBinaryString(binaryString);
+		
 		saveAvailability();
 		dragSelection.start = null;
 		dragSelection.end = null;
@@ -398,7 +406,36 @@
 		return `${hour12}${minutes ? ':' + minutes : ''} ${ampm}`;
 	}
 
+	// Add these new functions near other utility functions
+	function convertToBinaryString(availability: Availability): string {
+		let binaryString = '';
+		if (!event) return binaryString;
+		
+		event.dates.forEach(date => {
+			event?.timeSlots.forEach(timeSlot => {
+				binaryString += availability[date]?.[timeSlot] ? '1' : '0';
+			});
+		});
+		return binaryString;
+	}
+
+	function convertFromBinaryString(binaryString: string): Availability {
+		const newAvailability: Availability = {};
+		if (!event) return newAvailability;
+		
+		let index = 0;
+		event.dates.forEach(date => {
+			newAvailability[date] = {};
+			event?.timeSlots.forEach(timeSlot => {
+				newAvailability[date][timeSlot] = binaryString[index] === '1';
+				index++;
+			});
+		});
+		return newAvailability;
+	}
+
 	// ========== API Interactions ==========
+	// Modify the saveAvailability function
 	async function saveAvailability() {
 		if (!isLoggedIn || !token) {
 			alert('Please sign in to save availability.');
@@ -411,6 +448,8 @@
 		}
 
 		try {
+			const binaryAvailability = convertToBinaryString(availability);
+			
 			const response = await fetch(`/api/events/${eventId}/responses`, {
 				method: 'POST',
 				headers: {
@@ -419,7 +458,7 @@
 				},
 				body: JSON.stringify({
 					participantName,
-					availability,
+					binaryAvailability,
 					timezone
 				})
 			});
