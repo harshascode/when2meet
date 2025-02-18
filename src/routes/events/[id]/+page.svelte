@@ -837,24 +837,26 @@
 													</div>
 												{/each}
 												{#each event?.timeSlots || [] as timeSlot}
-													<!-- svelte-ignore a11y_mouse_events_have_key_events -->
 													<div
 														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
 													>
 														{timeSlot}
 													</div>
 													{#each event?.dates || [] as date}
-														<!-- svelte-ignore a11y_mouse_events_have_key_events -->
-														<div
-															class="h-10 border-b border-r border-gray-200"
+														<!-- Replace the group availability cell div with a button -->
+														<button
+															type="button"
+															class="h-10 border-b border-r border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
 															style="background-color: rgba(34, 197, 94, {getGroupAvailability(
 																date,
 																timeSlot
 															) / 100})"
 															onmouseover={() => handleCellHover(date, timeSlot)}
 															onmouseout={handleCellLeave}
-															role="presentation"
-														></div>
+															onfocus={() => handleCellHover(date, timeSlot)}
+															onblur={handleCellLeave}
+															aria-label="Group availability for {formatDate(date)} at {timeSlot}"
+														></button>
 													{/each}
 												{/each}
 											</div>
