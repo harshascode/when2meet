@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* jetbrains-mono-latin-wght-normal */
-@font-face {
+/* @font-face {
 	font-family: 'JetBrains Mono Variable';
 	font-style: normal;
 	font-display: swap;
@@ -15,7 +15,7 @@
   body {
 	font-family: 'JetBrains Mono Variable', monospace;
 
-  }
+  } */
 
 @layer base {
 	:root {
