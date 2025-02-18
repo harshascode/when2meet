@@ -305,7 +305,7 @@
 	}
 
 	function formatDate(dateStr: string): string {
-		return format(new Date(dateStr), 'MMM d\nEEE');
+		return format(new Date(dateStr), 'MMM d\n eee');  // Changed 'EEE' to 'eee' for shorter day names
 	}
 
 	function formatDateTime(dateStr: string): string {
@@ -387,6 +387,15 @@
 		if (hoverTimeout) clearTimeout(hoverTimeout);
 		hoverTimeout = null;
 		hoveredCell = null;
+	}
+
+	// Add this new helper function with the other utility functions
+	function formatTime(timeStr: string): string {
+		const [hours, minutes] = timeStr.split(':');
+		const hour = parseInt(hours, 10);
+		const ampm = hour >= 12 ? 'PM' : 'AM';
+		const hour12 = hour % 12 || 12;
+		return `${hour12}${minutes ? ':' + minutes : ''} ${ampm}`;
 	}
 
 	// ========== API Interactions ==========
@@ -757,15 +766,15 @@
 										<div class="overflow-hidden rounded-lg border border-gray-200">
 											<div
 												class="grid bg-white"
-												style="grid-template-columns: 60px repeat({event?.dates?.length ||
-													0}, minmax(60px, 1fr))"
+												style="grid-template-columns: 75px repeat({event?.dates?.length ||
+													0}, minmax(45px, 1fr))"
 											>
 												<div
-													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"
+													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-1"
 												></div>
 												{#each event?.dates || [] as date}
 													<div
-														class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-xs font-medium text-gray-700"
+														class="border-b border-r border-gray-200 bg-gray-50 p-1 text-center text-[10px] font-medium text-gray-700 whitespace-pre-line"
 													>
 														{formatDate(date)}
 													</div>
@@ -773,14 +782,14 @@
 
 												{#each event?.timeSlots || [] as timeSlot}
 													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
+														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-1 text-xs text-gray-600"
 													>
-														{timeSlot}
+														 {formatTime(timeSlot)}
 													</div>
 													{#each event?.dates || [] as date}
 														<button
 															type="button"
-															class="relative h-10 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
+															class="relative h-8 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
 															class:bg-green-500={availability[date]?.[timeSlot]}
 															class:bg-gray-100={!availability[date]?.[timeSlot]}
 															class:cursor-pointer={isLoggedIn}
@@ -793,7 +802,7 @@
 														>
 															<div class="pointer-events-none h-full w-full">
 																{#if isInDragSelection(date, timeSlot)}
-																	<div class="absolute inset-0 bg-blue-200 opacity-50"></div>
+																	<div class="absolute inset-0 bg-green-400 opacity-50"></div>
 																{/if}
 															</div>
 														</button>
@@ -823,30 +832,30 @@
 										<div class="overflow-hidden rounded-lg border border-gray-200">
 											<div
 												class="grid bg-white"
-												style="grid-template-columns: 60px repeat({event?.dates?.length ||
-													0}, minmax(60px, 1fr))"
+												style="grid-template-columns: 75px repeat({event?.dates?.length ||
+													0}, minmax(45px, 1fr))"
 											>
 												<div
-													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"
+													class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-1"
 												></div>
 												{#each event?.dates || [] as date}
 													<div
-														class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-xs font-medium text-gray-700"
+														class="border-b border-r border-gray-200 bg-gray-50 p-1 text-center text-[10px] font-medium text-gray-700 whitespace-pre-line"
 													>
 														{formatDate(date)}
 													</div>
 												{/each}
 												{#each event?.timeSlots || [] as timeSlot}
 													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
+														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-1 text-xs text-gray-600"
 													>
-														{timeSlot}
+														 {formatTime(timeSlot)}
 													</div>
 													{#each event?.dates || [] as date}
 														<!-- Replace the group availability cell div with a button -->
 														<button
 															type="button"
-															class="h-10 border-b border-r border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+															class="h-8 border-b border-r border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
 															style="background-color: rgba(34, 197, 94, {getGroupAvailability(
 																date,
 																timeSlot
@@ -877,7 +886,7 @@
 				style="top: {mouseY + 10}px; left: {mouseX + 10}px"
 			>
 				<h4 class="mb-3 text-sm font-semibold text-gray-900">
-					{formatDate(hoveredCell.date)} at {hoveredCell.timeSlot}
+					{formatDate(hoveredCell.date)} at {formatTime(hoveredCell.timeSlot)}
 				</h4>
 				<div class="space-y-3">
 					<div>
@@ -945,26 +954,26 @@
 							<div class="overflow-hidden rounded-lg border border-gray-200">
 								<div
 									class="grid bg-white"
-									style="grid-template-columns: 60px repeat({event?.dates?.length ||
-										0}, minmax(60px, 1fr))"
+									style="grid-template-columns: 45px repeat({event?.dates?.length ||
+										0}, minmax(45px, 1fr))"
 								>
-									<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-2"></div>
+									<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-1"></div>
 									{#each event?.dates || [] as date}
 										<div
-											class="border-b border-r border-gray-200 bg-gray-50 p-2 text-center text-xs font-medium text-gray-700"
+											class="border-b border-r border-gray-200 bg-gray-50 p-1 text-center text-xs font-medium text-gray-700"
 										>
 											{formatDate(date)}
 										</div>
 									{/each}
 									{#each event?.timeSlots || [] as timeSlot}
 										<div
-											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-2 text-xs text-gray-600"
-										>
-											{timeSlot}
+											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-1 text-xs text-gray-600"
+											>
+											 {formatTime(timeSlot)}
 										</div>
 										{#each event?.dates || [] as date}
 											<div
-												class="h-10 border-b border-r border-gray-200 transition-colors duration-75"
+												class="h-8 border-b border-r border-gray-200 transition-colors duration-75"
 												class:bg-green-500={getParticipantAvailability(
 													selectedParticipant,
 													date,
