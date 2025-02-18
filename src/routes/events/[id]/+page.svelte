@@ -802,7 +802,7 @@
 														>
 															<div class="pointer-events-none h-full w-full">
 																{#if isInDragSelection(date, timeSlot)}
-																	<div class="absolute inset-0 bg-green-400 opacity-50"></div>
+																	<div class="absolute inset-0 bg-green-300 opacity-50"></div>
 																{/if}
 															</div>
 														</button>
