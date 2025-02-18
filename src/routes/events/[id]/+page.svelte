@@ -83,6 +83,8 @@
 	let hoveredCell = $state<{ date: string; timeSlot: string } | null>(null);
 	let hoverTimeout: ReturnType<typeof setTimeout> | null = $state(null);
 
+	let isDragStarted = $state(false);
+
 	// ========== Constants ==========
 	const timezones = Intl.supportedValuesOf('timeZone');
 	const initialTouchX = 0;
@@ -180,21 +182,33 @@
 			return;
 		}
 
-		const currentState = availability[date]?.[timeSlot] || false;
-		availability[date] = availability[date] || {};
-		availability[date][timeSlot] = !currentState;
-		await saveAvailability();
+		// Only handle click if we haven't started dragging
+		if (!isDragStarted) {
+			const currentState = availability[date]?.[timeSlot] || false;
+			availability[date] = availability[date] || {};
+			availability[date][timeSlot] = !currentState;
+			await saveAvailability();
+		}
 	}
 
 	function handleDrag(date: string, timeSlot: string) {
 		if (!isLoggedIn || !isDragging || !participantName) return;
+		
+		// Set isDragStarted to true if the drag position changes from the start position
+		if (dragSelection.start && (dragSelection.start.date !== date || dragSelection.start.timeSlot !== timeSlot)) {
+			isDragStarted = true;
+		}
+		
 		dragSelection.end = { date, timeSlot };
 	}
 
 	function stopDrag() {
 		if (isDragging) {
 			isDragging = false;
-			updateDragSelection();
+			if (isDragStarted) {
+				updateDragSelection();
+			}
+			isDragStarted = false;
 			window.removeEventListener('mouseup', globalStopDrag);
 		}
 	}
@@ -250,6 +264,7 @@
 		}
 
 		if (!isMobileDevice()) {
+			isDragStarted = false;
 			isDragging = true;
 			dragSelection.start = { date, timeSlot };
 			dragSelection.end = { date, timeSlot };
@@ -439,8 +454,7 @@
 				name: response.participant_name,
 				timezone: response.timezone,
 				availability: {},
-				lastUpdated: response.created_at,
-				hasPassword: undefined
+				lastUpdated: response.created_at
 			};
 
 			participant.availability[response.date] = participant.availability[response.date] || {};
@@ -451,31 +465,6 @@
 		participants = Array.from(participantMap.values()).sort(
 			(a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
 		);
-		fetchParticipantData();
-	}
-
-	async function fetchParticipantData() {
-		if (!event) return;
-		try {
-			const response = await fetch(`/api/events/${eventId}/participants`);
-			if (!response.ok) throw new Error('Failed to fetch participant data');
-			const participantData = await response.json();
-
-			const participantMap = new Map<string, Participant>();
-			participantData.forEach((data: Participant) => {
-				participantMap.set(data.name, data);
-			});
-
-			participants = participants.map((p) => {
-				const participantFromData = participantMap.get(p.name);
-				if (participantFromData) {
-					return { ...p, hasPassword: participantFromData.hasPassword };
-				}
-				return p;
-			});
-		} catch (error) {
-			console.error('Error fetching participant passwords:', error);
-		}
 	}
 
 	// ========== Error Handling ==========
@@ -701,21 +690,6 @@
 											<div>
 												<div class="flex items-center gap-2">
 													<p class="text-sm font-medium text-gray-900">{participant.name}</p>
-													{#if participant.hasPassword}
-														<svg
-															class="h-4 w-4 text-blue-500"
-															fill="none"
-															viewBox="0 0 24 24"
-															stroke="currentColor"
-														>
-															<path
-																stroke-linecap="round"
-																stroke-linejoin="round"
-																stroke-width="2"
-																d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-															/>
-														</svg>
-													{/if}
 												</div>
 												<p class="mt-0.5 text-xs text-gray-500">{participant.timezone}</p>
 											</div>
