@@ -1,17 +1,123 @@
-<header class="border-b">
-	<div class="container flex h-14 items-center px-4">
-		<div class="flex gap-6 md:gap-10">
-			<a href="/" class="flex items-center space-x-2">
-				<span class="font-bold">When2meet</span>
+<script lang="ts">
+	import { onMount } from 'svelte';
+	
+	let isOpen = false;
+	
+	// Simple toggle function
+	function toggleMenu() {
+	  isOpen = !isOpen;
+	}
+	
+	// Close menu when clicking anywhere when menu is open
+	function handleClick() {
+	  if (isOpen) {
+		isOpen = false;
+	  }
+	}
+	
+	// Close menu on route change
+	onMount(() => {
+	  return () => {
+		isOpen = false;
+	  };
+	});
+  </script>
+  
+  <header class="fixed top-0 z-50 w-full bg-white shadow-sm">
+	<div class="container mx-auto px-4">
+	  <div class="relative flex h-16 items-center justify-between">
+		<!-- Logo -->
+		<a href="/" class="flex items-center space-x-2">
+		  <svg class="h-6 w-6 text-slate-800" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+			<rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke-width="2" />
+			<line x1="3" y1="10" x2="21" y2="10" stroke-width="2" />
+			<line x1="16" y1="2" x2="16" y2="6" stroke-width="2" />
+			<line x1="8" y1="2" x2="8" y2="6" stroke-width="2" />
+		  </svg>
+		  <span class="text-lg font-semibold text-slate-900">When2meet</span>
+		</a>
+  
+		<!-- Desktop Navigation -->
+		<nav class="hidden items-center space-x-8 md:flex">
+		  <a href="/" class="text-sm font-medium text-slate-600 hover:text-slate-900">
+			Plan Event
+		  </a>
+		  <a href="/my-events" class="text-sm font-medium text-slate-600 hover:text-slate-900">
+			My Events
+		  </a>
+		  <a
+			href="/"
+			class="rounded-sm bg-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+		  >
+			Create Event
+		  </a>
+		</nav>
+  
+		<!-- Mobile Menu Button -->
+		<button
+		  class="rounded p-1 hover:bg-slate-100 md:hidden"
+		  on:click|stopPropagation={toggleMenu}
+		  aria-label="Menu"
+		>
+		  <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+			{#if isOpen}
+			  <path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M6 18L18 6M6 6l12 12"
+			  />
+			{:else}
+			  <path
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				stroke-width="2"
+				d="M4 6h16M4 12h16M4 18h16"
+			  />
+			{/if}
+		  </svg>
+		</button>
+	  </div>
+  
+	  <!-- Mobile Menu -->
+	  {#if isOpen}
+		<div
+		  class="absolute left-0 right-0 top-16 border-b border-slate-200 bg-white shadow-lg"
+		  on:click|stopPropagation
+		>
+		  <nav class="flex flex-col">
+			<a
+			  href="/"
+			  class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+			  on:click={handleClick}
+			>
+			  Plan Event
 			</a>
-			<nav class="flex gap-6">
-				<a
-					href="/"
-					class="text-sm font-medium text-green-600 transition-colors hover:text-green-700"
-				>
-					Plan a New Event
-				</a>
-			</nav>
+			<a
+			  href="/my-events"
+			  class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+			  on:click={handleClick}
+			>
+			  My Events
+			</a>
+			<div class="p-4">
+			  <a
+				href="/"
+				class="block w-full rounded-sm bg-slate-800 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-700"
+				on:click={handleClick}
+			  >
+				Create Event
+			  </a>
+			</div>
+		  </nav>
 		</div>
+	  {/if}
 	</div>
-</header>
+  </header>
+  
+  <!-- Spacer to prevent content from going under fixed header -->
+  <div class="h-16" />
+  
+  <style>
+	/* Add any custom styles here if needed */
+  </style>

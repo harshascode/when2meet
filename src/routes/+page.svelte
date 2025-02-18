@@ -403,7 +403,7 @@
 
 	<main class="container mx-auto max-w-6xl px-4 py-8">
 		<!-- Professional Header -->
-		<div class="mb-12 text-center">
+		<div class="mb-4 text-center">
 			<h1 class="mb-3 text-3xl font-semibold text-slate-800 md:text-4xl">Schedule Your Event</h1>
 			<p class="mx-auto max-w-2xl text-base text-slate-600">
 				Select dates and times to find the perfect meeting slot
@@ -411,7 +411,7 @@
 		</div>
 
 		<!-- Event Creation Section -->
-		<div class="mx-auto max-w-5xl rounded-md p-6">
+		<div class="mx-auto max-w-5xl rounded-md md:p-6">
 			<!-- Event Name Input -->
 			<div class="mx-auto mb-8 max-w-2xl">
 				<input
