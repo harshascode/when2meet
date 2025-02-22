@@ -827,7 +827,7 @@
 
 												{#each event?.timeSlots || [] as timeSlot}
 													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-1 text-xs text-gray-600"
+														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
 													>
 														 {formatTime(timeSlot)}
 													</div>
@@ -892,7 +892,7 @@
 												{/each}
 												{#each event?.timeSlots || [] as timeSlot}
 													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-1 text-xs text-gray-600"
+														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
 													>
 														 {formatTime(timeSlot)}
 													</div>
@@ -927,7 +927,7 @@
 		{#if hoveredCell}
 			{@const participants = getParticipantsForSlot(hoveredCell.date, hoveredCell.timeSlot)}
 			<div
-				class="z-50 min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg md:fixed"
+				class="z-50 min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 my-2 shadow-lg md:fixed"
 				style="top: {mouseY + 10}px; left: {mouseX + 10}px"
 			>
 				<h4 class="mb-3 text-sm font-semibold text-gray-900">
@@ -1012,7 +1012,7 @@
 									{/each}
 									{#each event?.timeSlots || [] as timeSlot}
 										<div
-											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white p-1 text-xs text-gray-600"
+											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
 											>
 											 {formatTime(timeSlot)}
 										</div>
