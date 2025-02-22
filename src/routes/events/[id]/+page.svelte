@@ -187,6 +187,9 @@
 			const currentState = availability[date]?.[timeSlot] || false;
 			availability[date] = availability[date] || {};
 			availability[date][timeSlot] = !currentState;
+			// Clear any leftover drag selection
+			dragSelection.start = null;
+			dragSelection.end = null;
 			await saveAvailability();
 		}
 	}
@@ -209,6 +212,9 @@
 				updateDragSelection();
 			}
 			isDragStarted = false;
+			// Make sure to clear the drag selection
+			dragSelection.start = null;
+			dragSelection.end = null;
 			window.removeEventListener('mouseup', globalStopDrag);
 		}
 	}
