@@ -993,7 +993,7 @@
 							<div class="overflow-hidden rounded-lg border border-gray-200">
 								<div
 									class="grid bg-white"
-									style="grid-template-columns: 45px repeat({event?.dates?.length ||
+									style="grid-template-columns: 75px repeat({event?.dates?.length ||
 										0}, minmax(45px, 1fr))"
 								>
 									<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-1"></div>
