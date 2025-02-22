@@ -3,16 +3,20 @@
 	
 	let isOpen = false;
 	
-	// Simple toggle function
 	function toggleMenu() {
-	  isOpen = !isOpen;
+		isOpen = !isOpen;
 	}
 	
-	// Close menu when clicking anywhere when menu is open
 	function handleClick() {
-	  if (isOpen) {
-		isOpen = false;
-	  }
+		if (isOpen) {
+			isOpen = false;
+		}
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		if (event.key === 'Escape' && isOpen) {
+			isOpen = false;
+		}
 	}
 	
 	// Close menu on route change
@@ -84,6 +88,9 @@
 		<div
 		  class="absolute left-0 right-0 top-16 border-b border-slate-200 bg-white shadow-lg"
 		  on:click|stopPropagation
+		  on:keydown={handleKeyDown}
+		  role="menu"
+		  tabindex="-1"
 		>
 		  <nav class="flex flex-col">
 			<a
@@ -116,7 +123,7 @@
   </header>
   
   <!-- Spacer to prevent content from going under fixed header -->
-  <div class="h-16" />
+  <div class="h-16"></div>
   
   <style>
 	/* Add any custom styles here if needed */

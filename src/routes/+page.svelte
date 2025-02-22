@@ -395,6 +395,13 @@
 			window.removeEventListener('mouseup', onWindowMouseUp);
 		}
 	});
+
+	function handleKeyDown(event: KeyboardEvent, cell: Cell) {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			toggleCell(cell);
+		}
+	}
 </script>
 
 <!-- MAIN MARKUP -->
@@ -476,11 +483,12 @@
 							onmousemove={handleMouseMove}
 						>
 							{#each days as day}
-								<div class="cell header">{day}</div>
+								<div class="cell header" role="columnheader">{day}</div>
 							{/each}
 							{#each grid as row}
 								{#each row as cell}
-									<div
+									<button
+										type="button"
 										class="cell {cell.selected ? 'selected' : ''} {cell.inCurrentMonth
 											? ''
 											: 'other-month'} 
@@ -498,14 +506,14 @@
 										data-row={cell.row}
 										data-col={cell.col}
 										role="gridcell"
-										tabindex="0"
 										aria-selected={cell.selected}
-										aria-label={`Select ${cell.date}`}
+										aria-label={`${cell.date} ${getMonthName(currentYear, currentMonth)} ${currentYear}`}
 										onmousedown={(e) => handleMouseDown(cell, e)}
 										onclick={() => toggleCell(cell)}
+										onkeydown={(e) => handleKeyDown(e, cell)}
 									>
 										{cell.date}
-									</div>
+									</button>
 								{/each}
 							{/each}
 						</div>
@@ -643,6 +651,8 @@
 		cursor: pointer;
 		position: relative;
 		transition: all 0.15s;
+		width: 100%;
+		padding: 0;
 	}
 	/* .cell:hover:not(.header) {
         background-color: #f8fafc;
@@ -652,6 +662,7 @@
 		color: #475569;
 		background-color: #f8fafc;
 		cursor: default;
+		border: none;
 	}
 	.selected {
 		background-color: #1e293b;
