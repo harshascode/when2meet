@@ -20,6 +20,9 @@
 		"@sveltejs/kit": "^2.16.0",
 		"@sveltejs/vite-plugin-svelte": "^5.0.0",
 		"@tailwindcss/vite": "^4.0.0",
+		"@types/better-sqlite3": "^7.6.12",
+		"@types/uuid": "^10.0.0",
+		"@types/jsonwebtoken": "^9.0.9",
 		"eslint": "^9.18.0",
 		"eslint-config-prettier": "^10.0.1",
 		"eslint-plugin-svelte": "^2.46.1",
@@ -38,5 +41,12 @@
 		"onlyBuiltDependencies": [
 			"esbuild"
 		]
+	},
+	"dependencies": {
+		"better-sqlite3": "^11.8.1",
+		"date-fns": "^4.1.0",
+		"js-sha256": "^0.11.0",
+		"jsonwebtoken": "^9.0.2",
+		"uuid": "^11.1.0"
 	}
 }
