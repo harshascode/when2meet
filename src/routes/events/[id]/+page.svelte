@@ -37,7 +37,7 @@
 	}
 
 	// ========== Imports ==========
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
 	import Footer from '$lib/Footer.svelte';
@@ -45,7 +45,7 @@
 	import { browser } from '$app/environment';
 
 	// ========== State Management ==========
-	const eventId = $page.params.id;
+	const eventId = page.params.id;
 
 	let event: Event | null = $state(null);
 	let loading = $state(true);
