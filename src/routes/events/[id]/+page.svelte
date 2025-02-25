@@ -606,7 +606,7 @@
 		{:else if error}
 			<div class="rounded-lg bg-red-50 p-4 text-center text-sm text-red-600">{error}</div>
 		{:else}
-			<div class="space-y-8">
+			<div class="space-y-6">
 				<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 					<h1 class="text-2xl font-semibold text-gray-900">{event?.name}</h1>
 					<div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -628,8 +628,8 @@
 				</div>
 
 				<div>
-					<div class="flex flex-col gap-8 lg:flex-row">
-						<div class="w-full space-y-8 lg:w-1/4">
+					<div class="flex flex-col gap-6 lg:flex-row">
+						<div class="w-full space-y-6 lg:w-1/4">
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<h2 class="mb-4 text-lg font-semibold text-gray-900">
 									{isLoggedIn ? 'Your Information' : 'Sign In'}
@@ -790,7 +790,7 @@
 							</div>
 						</div>
 
-						<div class="w-full gap-6 space-y-8 lg:w-3/4">
+						<div class="w-full gap-6 space-y-6 lg:w-3/4">
 							<div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
 								<div class="mb-6 flex flex-col items-center justify-between sm:flex-row">
 									<h2 class="text-lg font-semibold text-gray-900">Your Availability</h2>
