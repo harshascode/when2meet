@@ -147,6 +147,7 @@
 		token = '';
 		if (browser) {
 			localStorage.removeItem('authToken');
+			localStorage.removeItem('currentEventId');
 		}
 		initializeAvailability();
 	}
@@ -575,11 +576,20 @@
 
 	// Modify the onMount function
 	onMount(async () => {
+		// Check if we switched to a different event
 		if (browser) {
-			const storedToken = localStorage.getItem('authToken');
-			if (storedToken) {
-				token = storedToken;
-				await initializeFromToken();
+			const storedEventId = localStorage.getItem('currentEventId');
+			if (storedEventId !== eventId) {
+				// Clear auth state when switching to a different event
+				handleSignOut();
+				localStorage.setItem('currentEventId', eventId);
+			} else {
+				// Only try to restore auth if it's the same event
+				const storedToken = localStorage.getItem('authToken');
+				if (storedToken) {
+					token = storedToken;
+					await initializeFromToken();
+				}
 			}
 		}
 
