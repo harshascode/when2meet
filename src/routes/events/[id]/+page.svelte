@@ -546,16 +546,40 @@
 	}
 
 	// ========== Lifecycle Hooks ==========
+	// Add this new function before the onMount
+	async function initializeFromToken() {
+		if (browser && token) {
+			try {
+				const response = await fetch(`/api/events/${eventId}/verify`, {
+					method: 'POST',
+					headers: {
+						Authorization: `Bearer ${token}`,
+						'Content-Type': 'application/json'
+					}
+				});
+
+				if (response.ok) {
+					const data = await response.json();
+					participantName = data.participantName;
+					isLoggedIn = true;
+					return true;
+				} else {
+					handleSignOut();
+				}
+			} catch (error) {
+				handleSignOut();
+			}
+		}
+		return false;
+	}
+
+	// Modify the onMount function
 	onMount(async () => {
 		if (browser) {
-			token = localStorage.getItem('authToken') || '';
-			isLoggedIn = !!token;
-		}
-
-		if (token) {
-			const isValid = await verifyToken();
-			if (!isValid) {
-				handleSignOut();
+			const storedToken = localStorage.getItem('authToken');
+			if (storedToken) {
+				token = storedToken;
+				await initializeFromToken();
 			}
 		}
 
