@@ -125,6 +125,7 @@
 				isLoggedIn = true;
 				loginError = '';
 				await refreshEventData();
+				restoreUserAvailability(); // Add this line
 			} else {
 				loginError = data.error || 'Error signing in';
 				isLoggedIn = false;
@@ -441,6 +442,32 @@
 		return newAvailability;
 	}
 
+	// Add this new function after updateParticipants()
+	function restoreUserAvailability() {
+		if (!event?.responses || !participantName) return;
+		
+		// Reset availability first
+		availability = {};
+		
+		// Initialize the structure
+		event.dates.forEach(date => {
+			availability[date] = {};
+			event?.timeSlots.forEach(timeSlot => {
+				availability[date][timeSlot] = false;
+			});
+		});
+
+		// Restore user's responses
+		event.responses.forEach(response => {
+			if (response.participant_name === participantName) {
+				if (!availability[response.date]) {
+					availability[response.date] = {};
+				}
+				availability[response.date][response.time_slot] = true;
+			}
+		});
+	}
+
 	// ========== API Interactions ==========
 	// Modify the saveAvailability function
 	async function saveAvailability() {
@@ -486,6 +513,7 @@
 		}
 	}
 
+	// Modify the refreshEventData function
 	async function refreshEventData() {
 		try {
 			const response = await fetch(`/api/events/${eventId}`);
@@ -493,6 +521,9 @@
 
 			event = (await response.json()) as Event;
 			updateParticipants();
+			if (isLoggedIn && participantName) {
+				restoreUserAvailability(); // Add this line
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load event';
 		}
@@ -563,6 +594,7 @@
 					const data = await response.json();
 					participantName = data.participantName;
 					isLoggedIn = true;
+					restoreUserAvailability(); // Add this line
 					return true;
 				} else {
 					handleSignOut();
