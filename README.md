@@ -1,38 +1,29 @@
-# sv
+Working on your own and just want it to work? Follow these instructions below, they’ve worked reliably for me and many others for years.
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Working with others? Git is complicated. Read the comments below this answer, consider other answers, and discuss with your team before you do something rash.
 
-## Creating a project
+Reverting Working Copy to Most Recent Commit
+To revert to the previous commit, ignoring any changes:
 
-If you're seeing this, you've probably already done this step. Congrats!
+git reset --hard HEAD
+where HEAD is the last commit in your current branch
 
-```bash
-# create a new project in the current directory
-npx sv create
+Reverting The Working Copy to an Older Commit
+To revert to a commit that's older than the most recent commit:
 
-# create a new project in my-app
-npx sv create my-app
-```
+# Resets index to former commit; replace '56e05fced' with your commit code
+git reset 56e05fced 
 
-## Developing
+# Moves pointer back to previous HEAD
+git reset --soft HEAD@{1}
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+git commit -m "Revert to 56e05fced"
 
-```bash
-npm run dev
+# Updates working copy to reflect the new commit
+git reset --hard
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+# Push your changes to respective branch
+git push -f
+Credits go to a similar Stack Overflow question, Revert to a commit by a SHA hash in Git?.
 
-## Building
-
-To create a production version of your app:
-
-```bash
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+https://stackoverflow.com/questions/4114095/how-do-i-revert-a-git-repository-to-a-previous-commit
