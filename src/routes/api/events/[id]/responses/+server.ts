@@ -102,7 +102,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 				token,
 				message: 'Logged in successfully'
 			});
-		 }
+		}
 
 		// Verify auth token
 		const authHeader = request.headers.get('Authorization');
@@ -120,10 +120,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		// Delete existing responses
 		dbOperations.deleteParticipantResponses.run(params.id, participantName);
 
-		 // Get event dates and time slots
+		// Get event dates and time slots
 		const eventDates = dbOperations.getEventDates.all(params.id);
 		const eventTimeSlots = dbOperations.getEventTimeSlots.all(params.id);
-		
+
 		// Process binary availability string
 		let index = 0;
 		eventDates.forEach((dateObj: any) => {

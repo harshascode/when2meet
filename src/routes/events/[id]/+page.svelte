@@ -198,12 +198,15 @@
 
 	function handleDrag(date: string, timeSlot: string) {
 		if (!isLoggedIn || !isDragging || !participantName) return;
-		
+
 		// Set isDragStarted to true if the drag position changes from the start position
-		if (dragSelection.start && (dragSelection.start.date !== date || dragSelection.start.timeSlot !== timeSlot)) {
+		if (
+			dragSelection.start &&
+			(dragSelection.start.date !== date || dragSelection.start.timeSlot !== timeSlot)
+		) {
 			isDragStarted = true;
 		}
-		
+
 		dragSelection.end = { date, timeSlot };
 	}
 
@@ -243,23 +246,24 @@
 
 		// Get the initial state from the first cell
 		const currentState = availability[dates[minDateIdx]]?.[timeSlots[minTimeIdx]] || false;
-		
+
 		// Create a temporary binary string
 		let binaryString = convertToBinaryString(availability);
-		
+
 		// Update only the cells within the selection
 		for (let d = minDateIdx; d <= maxDateIdx; d++) {
 			for (let t = minTimeIdx; t <= maxTimeIdx; t++) {
-				const index = (d * timeSlots.length) + t;
-				binaryString = binaryString.substring(0, index) + 
-							  (!currentState ? '1' : '0') + 
-							  binaryString.substring(index + 1);
+				const index = d * timeSlots.length + t;
+				binaryString =
+					binaryString.substring(0, index) +
+					(!currentState ? '1' : '0') +
+					binaryString.substring(index + 1);
 			}
 		}
-		
+
 		// Convert back to availability object
 		availability = convertFromBinaryString(binaryString);
-		
+
 		saveAvailability();
 		dragSelection.start = null;
 		dragSelection.end = null;
@@ -321,7 +325,7 @@
 	}
 
 	function formatDate(dateStr: string): string {
-		return format(new Date(dateStr), 'MMM d\n eee');  // Changed 'EEE' to 'eee' for shorter day names
+		return format(new Date(dateStr), 'MMM d\n eee'); // Changed 'EEE' to 'eee' for shorter day names
 	}
 
 	function formatDateTime(dateStr: string): string {
@@ -418,9 +422,9 @@
 	function convertToBinaryString(availability: Availability): string {
 		let binaryString = '';
 		if (!event) return binaryString;
-		
-		event.dates.forEach(date => {
-			event?.timeSlots.forEach(timeSlot => {
+
+		event.dates.forEach((date) => {
+			event?.timeSlots.forEach((timeSlot) => {
 				binaryString += availability[date]?.[timeSlot] ? '1' : '0';
 			});
 		});
@@ -430,11 +434,11 @@
 	function convertFromBinaryString(binaryString: string): Availability {
 		const newAvailability: Availability = {};
 		if (!event) return newAvailability;
-		
+
 		let index = 0;
-		event.dates.forEach(date => {
+		event.dates.forEach((date) => {
 			newAvailability[date] = {};
-			event?.timeSlots.forEach(timeSlot => {
+			event?.timeSlots.forEach((timeSlot) => {
 				newAvailability[date][timeSlot] = binaryString[index] === '1';
 				index++;
 			});
@@ -445,20 +449,20 @@
 	// Add this new function after updateParticipants()
 	function restoreUserAvailability() {
 		if (!event?.responses || !participantName) return;
-		
+
 		// Reset availability first
 		availability = {};
-		
+
 		// Initialize the structure
-		event.dates.forEach(date => {
+		event.dates.forEach((date) => {
 			availability[date] = {};
-			event?.timeSlots.forEach(timeSlot => {
+			event?.timeSlots.forEach((timeSlot) => {
 				availability[date][timeSlot] = false;
 			});
 		});
 
 		// Restore user's responses
-		event.responses.forEach(response => {
+		event.responses.forEach((response) => {
 			if (response.participant_name === participantName) {
 				if (!availability[response.date]) {
 					availability[response.date] = {};
@@ -483,7 +487,7 @@
 
 		try {
 			const binaryAvailability = convertToBinaryString(availability);
-			
+
 			const response = await fetch(`/api/events/${eventId}/responses`, {
 				method: 'POST',
 				headers: {
@@ -611,7 +615,7 @@
 		if (browser) {
 			const storedEventId = localStorage.getItem('currentEventId');
 			const storedToken = localStorage.getItem('authToken');
-			
+
 			if (storedEventId !== eventId) {
 				handleSignOut();
 				localStorage.setItem('currentEventId', eventId);
@@ -631,7 +635,7 @@
 			event = (await response.json()) as Event;
 			initializeAvailability();
 			updateParticipants();
-			
+
 			// Only restore availability after event data is loaded
 			if (isLoggedIn && participantName) {
 				restoreUserAvailability();
@@ -653,7 +657,8 @@
 		try {
 			await navigator.clipboard.writeText(window.location.href);
 			const successMessage = document.createElement('div');
-			successMessage.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
+			successMessage.className =
+				'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow';
 			successMessage.textContent = 'Link copied to clipboard!';
 			document.body.appendChild(successMessage);
 			setTimeout(() => successMessage.remove(), 3000);
@@ -695,8 +700,20 @@
 							title="Copy share link"
 							aria-label="Copy share link to clipboard"
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5" aria-hidden="true">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5A3.375 3.375 0 006.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0015 2.25h-1.5a2.251 2.251 0 00-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 00-9-9z" />
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke-width="1.5"
+								stroke="currentColor"
+								class="h-5 w-5"
+								aria-hidden="true"
+							>
+								<path
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									d="M8.25 7.5V6.108c0-1.135.845-2.098 1.976-2.192.373-.03.748-.057 1.123-.08M15.75 18H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08M15.75 18.75v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5A3.375 3.375 0 006.375 7.5H5.25m11.9-3.664A2.251 2.251 0 0015 2.25h-1.5a2.251 2.251 0 00-2.15 1.586m5.8 0c.065.21.1.433.1.664v.75h-6V4.5c0-.231.035-.454.1-.664M6.75 7.5H4.875c-.621 0-1.125.504-1.125 1.125v12c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V16.5a9 9 0 00-9-9z"
+								/>
 							</svg>
 						</button>
 					</div>
@@ -723,7 +740,7 @@
 												type="text"
 												id="participantName"
 												bind:value={participantName}
-												class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+												class="w-full rounded border px-3 py-2 text-sm shadow-sm transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
 												class:border-red-500={nameError}
 												class:border-gray-300={!nameError}
 												placeholder="Your name"
@@ -800,7 +817,7 @@
 										{/if}
 
 										<button
-											class="w-full rounded bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+											class="w-full rounded bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
 											onclick={handleSignIn}
 										>
 											Sign In
@@ -812,9 +829,8 @@
 											Signed in as: <span class="font-medium">{participantName}</span>
 										</p>
 										<div>
-											
-											<label 
-												for="timezone-select" 
+											<label
+												for="timezone-select"
 												class="mb-1 block text-sm font-medium text-gray-700"
 											>
 												Time Zone
@@ -830,7 +846,7 @@
 											</select>
 										</div>
 										<button
-											class="w-full rounded bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
+											class="w-full rounded bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 focus:ring-2 focus:ring-red-500 focus:outline-none"
 											onclick={handleSignOut}
 										>
 											Sign Out
@@ -894,7 +910,7 @@
 												></div>
 												{#each event?.dates || [] as date}
 													<div
-														class="border-b border-r border-gray-200 bg-gray-50 p-1 text-center text-[10px] font-medium text-gray-700 whitespace-pre-line"
+														class="border-r border-b border-gray-200 bg-gray-50 p-1 text-center text-[10px] font-medium whitespace-pre-line text-gray-700"
 													>
 														{formatDate(date)}
 													</div>
@@ -902,14 +918,14 @@
 
 												{#each event?.timeSlots || [] as timeSlot}
 													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
+														class="sticky left-0 z-10 border-r border-b border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
 													>
-														 {formatTime(timeSlot)}
+														{formatTime(timeSlot)}
 													</div>
 													{#each event?.dates || [] as date}
 														<button
 															type="button"
-															class="relative h-8 border-b border-r border-gray-200 transition-colors duration-75 focus:outline-none"
+															class="relative h-8 border-r border-b border-gray-200 transition-colors duration-75 focus:outline-none"
 															class:bg-green-500={availability[date]?.[timeSlot]}
 															class:bg-gray-100={!availability[date]?.[timeSlot]}
 															class:cursor-pointer={isLoggedIn}
@@ -960,22 +976,22 @@
 												></div>
 												{#each event?.dates || [] as date}
 													<div
-														class="border-b border-r border-gray-200 bg-gray-50 p-1 text-center text-[10px] font-medium text-gray-700 whitespace-pre-line"
+														class="border-r border-b border-gray-200 bg-gray-50 p-1 text-center text-[10px] font-medium whitespace-pre-line text-gray-700"
 													>
 														{formatDate(date)}
 													</div>
 												{/each}
 												{#each event?.timeSlots || [] as timeSlot}
 													<div
-														class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
+														class="sticky left-0 z-10 border-r border-b border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
 													>
-														 {formatTime(timeSlot)}
+														{formatTime(timeSlot)}
 													</div>
 													{#each event?.dates || [] as date}
 														<!-- Replace the group availability cell div with a button -->
 														<button
 															type="button"
-															class="h-8 border-b border-r border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
+															class="h-8 border-r border-b border-gray-200 focus:ring-2 focus:ring-blue-500 focus:outline-none focus:ring-inset"
 															style="background-color: rgba(34, 197, 94, {getGroupAvailability(
 																date,
 																timeSlot
@@ -1002,7 +1018,7 @@
 		{#if hoveredCell}
 			{@const participants = getParticipantsForSlot(hoveredCell.date, hoveredCell.timeSlot)}
 			<div
-				class="z-50 min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 my-2 shadow-lg md:fixed"
+				class="z-50 my-2 min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 shadow-lg md:fixed"
 				style="top: {mouseY + 10}px; left: {mouseX + 10}px"
 			>
 				<h4 class="mb-3 text-sm font-semibold text-gray-900">
@@ -1080,20 +1096,20 @@
 									<div class="sticky left-0 z-10 border-r border-gray-200 bg-gray-50 p-1"></div>
 									{#each event?.dates || [] as date}
 										<div
-											class="border-b border-r border-gray-200 bg-gray-50 p-1 text-center text-xs font-medium text-gray-700"
+											class="border-r border-b border-gray-200 bg-gray-50 p-1 text-center text-xs font-medium text-gray-700"
 										>
 											{formatDate(date)}
 										</div>
 									{/each}
 									{#each event?.timeSlots || [] as timeSlot}
 										<div
-											class="sticky left-0 z-10 border-b border-r border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
-											>
-											 {formatTime(timeSlot)}
+											class="sticky left-0 z-10 border-r border-b border-gray-200 bg-white px-2 py-1 text-xs text-gray-600"
+										>
+											{formatTime(timeSlot)}
 										</div>
 										{#each event?.dates || [] as date}
 											<div
-												class="h-8 border-b border-r border-gray-200 transition-colors duration-75"
+												class="h-8 border-r border-b border-gray-200 transition-colors duration-75"
 												class:bg-green-500={getParticipantAvailability(
 													selectedParticipant,
 													date,

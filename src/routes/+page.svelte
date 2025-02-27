@@ -426,7 +426,7 @@
 					placeholder="Event name"
 					class="w-full rounded-sm border {showEventNameError
 						? 'border-red-500'
-						: 'border-slate-300'} bg-white px-4 py-3 text-center font-medium text-slate-900 placeholder-slate-400 shadow-sm transition-all focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+						: 'border-slate-300'} bg-white px-4 py-3 text-center font-medium text-slate-900 placeholder-slate-400 shadow-sm transition-all focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
 					bind:value={eventName}
 					oninput={() => (showEventNameError = false)}
 				/>
@@ -530,7 +530,7 @@
 							<select
 								id="startTime"
 								bind:value={startTime}
-								class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+								class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
 							>
 								{#each timeSlots as timeOption}
 									<option value={timeOption.time}>{timeOption.formatted}</option>
@@ -544,7 +544,7 @@
 							<select
 								id="endTime"
 								bind:value={endTime}
-								class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+								class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
 							>
 								{#each timeSlots as timeOption}
 									<option value={timeOption.time}>{timeOption.formatted}</option>
@@ -560,7 +560,7 @@
 						<select
 							id="timezone"
 							bind:value={selectedTimeZone}
-							class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500"
+							class="w-full rounded-sm border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-500 focus:ring-1 focus:ring-slate-500 focus:outline-none"
 						>
 							{#each timeZones as tz}
 								<option value={tz.value}>{tz.label}</option>
@@ -590,7 +590,7 @@
 			<div class="mt-8 text-center">
 				<button
 					onclick={handleSubmit}
-					class="inline-flex items-center rounded-sm bg-slate-800 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 disabled:opacity-50"
+					class="inline-flex items-center rounded-sm bg-slate-800 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-slate-700 focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 focus:outline-none disabled:opacity-50"
 					disabled={!eventName || selectedDates.length === 0 || selectedTimes.length === 0}
 				>
 					Create Event
