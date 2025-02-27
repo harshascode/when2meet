@@ -1,36 +1,33 @@
 import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
 import { dbOperations } from '$lib/db/database';
 
-export const POST: RequestHandler = async ({ request }) => {
+export async function POST({ request }) {
 	try {
 		const eventData = await request.json();
+		const { id, name, dates, timeSlots } = eventData;
 
-		// Start database operations
-		dbOperations.createEvent.run(eventData.id, eventData.name, eventData.creator);
+		// Start a transaction
+		const transaction = dbOperations.db.transaction(() => {
+			// Create event
+			dbOperations.createEvent.run(id, name, null);
 
-		// Add dates
-		for (const date of eventData.dates) {
-			dbOperations.addEventDate.run(eventData.id, date);
-		}
+			// Add dates
+			for (const date of dates) {
+				dbOperations.addEventDate.run(id, date);
+			}
 
-		// Add time slots
-		for (const timeSlot of eventData.timeSlots) {
-			dbOperations.addEventTimeSlot.run(eventData.id, timeSlot);
-		}
-
-		return json({
-			success: true,
-			eventId: eventData.id
+			// Add time slots
+			for (const timeSlot of timeSlots) {
+				dbOperations.addEventTimeSlot.run(id, timeSlot);
+			}
 		});
+
+		// Execute transaction
+		transaction();
+
+		return json({ success: true, id });
 	} catch (error) {
-		console.error('Database error:', error);
-		return json(
-			{
-				success: false,
-				error: 'Failed to create event'
-			},
-			{ status: 500 }
-		);
+		console.error('Error creating event:', error);
+		return json({ success: false, error: 'Failed to create event' }, { status: 500 });
 	}
-};
+}

@@ -606,21 +606,20 @@
 		return false;
 	}
 
-	// Modify the onMount function
-	onMount(async () => {
-		// Check if we switched to a different event
+	// Add this new helper function before onMount
+	async function initializeAuthAndData() {
 		if (browser) {
 			const storedEventId = localStorage.getItem('currentEventId');
+			const storedToken = localStorage.getItem('authToken');
+			
 			if (storedEventId !== eventId) {
-				// Clear auth state when switching to a different event
 				handleSignOut();
 				localStorage.setItem('currentEventId', eventId);
-			} else {
-				// Only try to restore auth if it's the same event
-				const storedToken = localStorage.getItem('authToken');
-				if (storedToken) {
-					token = storedToken;
-					await initializeFromToken();
+			} else if (storedToken) {
+				token = storedToken;
+				const authSuccess = await initializeFromToken();
+				if (authSuccess) {
+					isLoggedIn = true;
 				}
 			}
 		}
@@ -632,11 +631,21 @@
 			event = (await response.json()) as Event;
 			initializeAvailability();
 			updateParticipants();
+			
+			// Only restore availability after event data is loaded
+			if (isLoggedIn && participantName) {
+				restoreUserAvailability();
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load event';
 		} finally {
 			loading = false;
 		}
+	}
+
+	// Replace the existing onMount function with this
+	onMount(async () => {
+		await initializeAuthAndData();
 	});
 
 	// Add this function to handle copying the URL

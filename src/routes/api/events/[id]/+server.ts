@@ -4,35 +4,31 @@ import { dbOperations } from '$lib/db/database';
 
 export const GET: RequestHandler = async ({ params }) => {
 	try {
-		const event = dbOperations.getEvent.get(params.id);
+		const { id } = params;
 
+		// Get event details
+		const event = dbOperations.getEvent.get(id);
 		if (!event) {
-			return json(
-				{
-					error: 'Event not found'
-				},
-				{ status: 404 }
-			);
+			return json({ error: 'Event not found' }, { status: 404 });
 		}
 
-		// Get associated data
-		const dates = dbOperations.getEventDates.all(params.id);
-		const timeSlots = dbOperations.getEventTimeSlots.all(params.id);
-		const responses = dbOperations.getEventResponses.all(params.id);
+		// Get dates
+		const dates = dbOperations.getEventDates.all(id).map((row: any) => row.date);
+
+		// Get time slots
+		const timeSlots = dbOperations.getEventTimeSlots.all(id).map((row: any) => row.time_slot);
+
+		// Get responses with password status
+		const responses = dbOperations.getEventResponsesWithPassword.all(id);
 
 		return json({
 			...event,
-			dates: (dates as { date: string }[]).map((d) => d.date),
-			timeSlots: (timeSlots as { time_slot: string }[]).map((t) => t.time_slot),
+			dates,
+			timeSlots,
 			responses
 		});
 	} catch (error) {
-		console.error('Database error:', error);
-		return json(
-			{
-				error: 'Failed to retrieve event'
-			},
-			{ status: 500 }
-		);
+		console.error('Error retrieving event:', error);
+		return json({ error: 'Failed to retrieve event' }, { status: 500 });
 	}
 };

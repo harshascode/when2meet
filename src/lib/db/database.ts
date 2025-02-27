@@ -14,38 +14,8 @@ db.pragma('page_size = 32768');
 // Initialize database with tables
 export function initializeDatabase() {
 	try {
-		// Create events table
+		// Create events table (remove duplicates)
 		db.exec(`
-            CREATE TABLE IF NOT EXISTS events (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                creator TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS event_dates (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_id TEXT,
-                date TEXT NOT NULL,
-                FOREIGN KEY (event_id) REFERENCES events(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS event_time_slots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_id TEXT,
-                time_slot TEXT NOT NULL,
-                FOREIGN KEY (event_id) REFERENCES events(id)
-            );
-
-            CREATE TABLE IF NOT EXISTS responses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_id TEXT,
-                participant_name TEXT NOT NULL,
-                date TEXT NOT NULL,
-                time_slot TEXT NOT NULL,
-                FOREIGN KEY (event_id) REFERENCES events(id)
-            );
-
             CREATE TABLE IF NOT EXISTS events (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -85,7 +55,6 @@ export function initializeDatabase() {
                 PRIMARY KEY (event_id, participant_name),
                 FOREIGN KEY (event_id) REFERENCES events(id)
             );
-            
         `);
 
 		console.log('Database tables created successfully');
