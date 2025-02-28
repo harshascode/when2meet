@@ -7,12 +7,9 @@
 		<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
 			<!-- About Section -->
 			<div>
-				<h6 class="mb-4 text-base font-semibold tracking-wider text-white uppercase">About</h6>
+				<h6 class="mb-4 text-base font-semibold tracking-wider text-white uppercase">About </h6>
 				<p class="text-justify">
-					<span class="font-medium">When2meet</span> is designed to make scheduling simple and efficient.
-					Our platform helps teams and individuals find the perfect meeting time without the complexity
-					of traditional scheduling tools. With no sign-up required and a clean interface, we focus on
-					providing the most straightforward scheduling experience possible.
+					<span class="font-medium">Whendomeet</span> is a younger sibling of When2meet.com. It's a newly upgraded, modern, elegant, aesthetic, and advanced version of When2meet. Whendomeet is a direct competitor to When2meet, but on steroids! You can find the perfect meeting time and date with this modern and elegant tool.
 				</p>
 			</div>
 
@@ -51,7 +48,7 @@
 		<!-- Copyright and Social Icons -->
 		<div class="flex flex-col items-center gap-4 md:flex-row md:justify-between">
 			<p class="text-center md:text-left">
-				Copyright &copy; {currentYear} <a href="/" class="hover:text-[#3366cc]">When2meet</a>. All
+				Copyright &copy; {currentYear} <a href="/" class="hover:text-[#3366cc]">Whendomeet</a>. All
 				Rights Reserved.
 			</p>
 

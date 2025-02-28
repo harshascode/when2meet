@@ -1,24 +1,20 @@
 <script lang="ts">
-	import { stopPropagation, createBubbler } from 'svelte/legacy';
-
-	const bubble = createBubbler();
 	import { onMount } from 'svelte';
 
 	let isOpen = $state(false);
 
-	function toggleMenu() {
+	function toggleMenu(event: Event) {
+		event.stopPropagation();
 		isOpen = !isOpen;
 	}
 
-	function handleClick() {
-		if (isOpen) {
-			isOpen = false;
-		}
+	function closeMenu() {
+		isOpen = false;
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
 		if (event.key === 'Escape' && isOpen) {
-			isOpen = false;
+			closeMenu();
 		}
 	}
 
@@ -61,7 +57,7 @@
 			<!-- Mobile Menu Button -->
 			<button
 				class="rounded p-1 hover:bg-slate-100 md:hidden"
-				onclick={stopPropagation(toggleMenu)}
+				onclick={toggleMenu}
 				aria-label="Menu"
 			>
 				<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +84,6 @@
 		{#if isOpen}
 			<div
 				class="absolute top-16 right-0 left-0 border-b border-slate-200 bg-white shadow-lg"
-				onclick={stopPropagation(bubble('click'))}
 				onkeydown={handleKeyDown}
 				role="menu"
 				tabindex="-1"
@@ -97,14 +92,14 @@
 					<a
 						href="/"
 						class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-						onclick={handleClick}
+						onclick={() => closeMenu()}
 					>
 						Plan Event
 					</a>
 					<a
 						href="/my-events"
 						class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-						onclick={handleClick}
+						onclick={() => closeMenu()}
 					>
 						My Events
 					</a>
@@ -112,7 +107,7 @@
 						<a
 							href="/"
 							class="block w-full rounded-sm bg-slate-800 px-4 py-2 text-center text-sm font-medium text-white hover:bg-slate-700"
-							onclick={handleClick}
+							onclick={() => closeMenu()}
 						>
 							Create Event
 						</a>
