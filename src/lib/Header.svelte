@@ -42,7 +42,6 @@
 
 			<!-- Desktop Navigation -->
 			<nav class="hidden items-center space-x-8 md:flex">
-				<a href="/" class="text-sm font-medium text-slate-600 hover:text-slate-900"> Plan Event </a>
 				<a href="/my-events" class="text-sm font-medium text-slate-600 hover:text-slate-900">
 					My Events
 				</a>
@@ -89,13 +88,7 @@
 				tabindex="-1"
 			>
 				<nav class="flex flex-col">
-					<a
-						href="/"
-						class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-						onclick={() => closeMenu()}
-					>
-						Plan Event
-					</a>
+					
 					<a
 						href="/my-events"
 						class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"
