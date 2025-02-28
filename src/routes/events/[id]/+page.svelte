@@ -40,8 +40,8 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
-	import Footer from '$lib/Footer.svelte';
-	import Header from '$lib/Header.svelte';
+	// import Footer from '$lib/Footer.svelte';
+	// import Header from '$lib/Header.svelte';
 	import { browser } from '$app/environment';
 
 	// ========== State Management ==========
@@ -673,7 +673,7 @@
 	onmousemove={trackMousePosition}
 	role="presentation"
 >
-	<Header />
+	<!-- <Header /> -->
 
 	<main class="container mx-auto max-w-7xl flex-1 px-4 py-6">
 		{#if loading}
@@ -1135,5 +1135,5 @@
 		{/if}
 	</main>
 
-	<Footer />
+	<!-- <Footer /> -->
 </div>

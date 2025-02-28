@@ -2,8 +2,8 @@
 	// ======================
 	// EVENT & TIME STATE CODE (unchanged)
 	// ======================
-	import Footer from '$lib/Footer.svelte';
-	import Header from '$lib/Header.svelte';
+	// import Footer from '$lib/Footer.svelte';
+	// import Header from '$lib/Header.svelte';
 	import { v4 as uuidv4 } from 'uuid';
 	import { onMount, onDestroy } from 'svelte';
 	import { browser } from '$app/environment';
@@ -406,7 +406,7 @@
 
 <!-- MAIN MARKUP -->
 <div class="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-	<Header />
+	<!-- <Header /> -->
 
 	<main class="container mx-auto max-w-6xl px-4 py-8">
 		<!-- Professional Header -->
@@ -607,7 +607,7 @@
 		</div>
 	</main>
 
-	<Footer />
+	<!-- <Footer /> -->
 </div>
 
 <style>
