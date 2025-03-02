@@ -26,3 +26,6 @@ events.*
 events.db
 events.db-shm
 events.db-wal
+
+pnpm-lock.yaml
+package-lock.json
