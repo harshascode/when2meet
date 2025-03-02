@@ -413,7 +413,8 @@
 		<div class="mb-4 text-center">
 			<h1 class="mb-3 text-3xl font-semibold text-slate-800 md:text-4xl">Schedule Your Event</h1>
 			<p class="mx-auto max-w-2xl text-base text-slate-600">
-				Select dates and times to find the perfect meeting slot. It's free! No registration required.
+				Select dates and times to find the perfect meeting slot. It's free! No registration
+				required.
 			</p>
 		</div>
 

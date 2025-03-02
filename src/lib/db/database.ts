@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3';
 
 // Create a database instance
-const db = new Database('events.db', { verbose: console.log });
+// const db = new Database('events.db', { verbose: console.log });
+const db = new Database('events.db');
 
 // Enable WAL mode for better concurrency
 db.pragma('journal_mode = WAL');

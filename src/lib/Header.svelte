@@ -88,7 +88,6 @@
 				tabindex="-1"
 			>
 				<nav class="flex flex-col">
-					
 					<a
 						href="/my-events"
 						class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900"

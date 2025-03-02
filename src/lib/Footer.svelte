@@ -7,9 +7,12 @@
 		<div class="grid grid-cols-1 gap-8 md:grid-cols-2">
 			<!-- About Section -->
 			<div>
-				<h6 class="mb-4 text-base font-semibold tracking-wider text-white uppercase">About </h6>
+				<h6 class="mb-4 text-base font-semibold tracking-wider text-white uppercase">About</h6>
 				<p class="text-justify">
-					<span class="font-medium">Whendomeet</span> is a younger sibling of When2meet.com. It's a newly upgraded, modern, elegant, aesthetic, and advanced version of When2meet. Whendomeet is a direct competitor to When2meet, but on steroids! You can find the perfect meeting time and date with this modern and elegant tool.
+					<span class="font-medium">Whendomeet</span> is a younger sibling of When2meet.com. It's a newly
+					upgraded, modern, elegant, aesthetic, and advanced version of When2meet. Whendomeet is a direct
+					competitor to When2meet, but on steroids! You can find the perfect meeting time and date with
+					this modern and elegant tool.
 				</p>
 			</div>
 
@@ -56,7 +59,7 @@
 			<ul class="flex gap-3">
 				<li>
 					<a
-						href="https://github.com/harshascode/when2meet"
+						href="https://github.com/harshascode/"
 						target="_blank"
 						rel="noopener noreferrer"
 						class="flex h-10 w-10 items-center justify-center rounded-full bg-[#33353d] text-white transition-colors duration-200 hover:bg-[#29aafe]"
@@ -71,7 +74,6 @@
 						</svg>
 					</a>
 				</li>
-				<!-- Add more social icons as needed -->
 			</ul>
 		</div>
 	</div>

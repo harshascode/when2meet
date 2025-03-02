@@ -34,7 +34,7 @@
 	});
 </script>
 
-<div class="container mx-auto px-4 py-8 h-[70vh]">
+<div class="container mx-auto h-[70vh] px-4 py-8">
 	<h1 class="mb-6 text-3xl font-bold">Event History</h1>
 
 	{#if events.length === 0}
